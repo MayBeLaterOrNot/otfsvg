@@ -97,10 +97,6 @@ static void writePath(render_context_t* context, const otfsvg_path_t* path)
             writeF(context,  "L%f %f", points[0].x, points[0].y);
             points += 1;
             break;
-        case otfsvg_path_element_quad_to:
-            writeF(context,  "Q%f %f %f %f", points[0].x, points[0].y, points[1].x, points[1].y);
-            points += 2;
-            break;
         case otfsvg_path_element_cubic_to:
             writeF(context,  "C%f %f %f %f %f %f", points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
             points += 3;
@@ -180,9 +176,9 @@ static void writePaint(render_context_t* context, const otfsvg_paint_t* paint)
     closeBranch(context);
 }
 
-static bool writeFill(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, otfsvg_fill_rule_t winding, const otfsvg_paint_t* paint)
+static bool writeFill(void* userdata, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, otfsvg_fill_rule_t winding, const otfsvg_paint_t* paint)
 {
-    render_context_t* context = canvas->data;
+    render_context_t* context = userdata;
     openBranch(context, "fill");
     writePath(context, path);
     writeTransform(context, matrix);
@@ -198,9 +194,9 @@ static bool writeFill(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, const 
     return true;
 }
 
-static bool writeStroke(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, const otfsvg_stroke_data_t* strokedata, const otfsvg_paint_t* paint)
+static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, const otfsvg_stroke_data_t* strokedata, const otfsvg_paint_t* paint)
 {
-    render_context_t* context = canvas->data;
+    render_context_t* context = userdata;
     openBranch(context,  "stroke");
     writePath(context, path);
     writeTransform(context, matrix);
@@ -256,9 +252,9 @@ static bool writeStroke(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, cons
     return true;
 }
 
-static bool pushGroup(otfsvg_canvas_t* canvas, float opacity, otfsvg_blend_mode_t mode)
+static bool pushGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
 {
-    render_context_t* context = canvas->data;
+    render_context_t* context = userdata;
     openBranch(context, "group");
     writeIndent(context);
     writeF(context,  "opacity : %f", opacity);
@@ -274,9 +270,9 @@ static bool pushGroup(otfsvg_canvas_t* canvas, float opacity, otfsvg_blend_mode_
     return true;
 }
 
-static bool popGroup(otfsvg_canvas_t* canvas, float opacity, otfsvg_blend_mode_t mode)
+static bool popGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
 {
-    render_context_t* context = canvas->data;
+    render_context_t* context = userdata;
     closeBranch(context);
     return true;
 }
@@ -339,8 +335,8 @@ int main(int argc, char* argv[])
     writeF(&context, "rect : %f %f %f %f", rect.x, rect.y, rect.w, rect.h);
     newLine(&context);
 
-    otfsvg_canvas_t canvas = {&context, writeFill, writeStroke, pushGroup, popGroup, NULL, NULL, NULL};
-    otfsvg_document_render(document, &canvas, otfsvg_black_color, id);
+    otfsvg_canvas_t canvas = {writeFill, writeStroke, pushGroup, popGroup, NULL, NULL};
+    otfsvg_document_render(document, &canvas, &context, NULL, NULL, otfsvg_black_color, id);
 
     closeBranch(&context);
 

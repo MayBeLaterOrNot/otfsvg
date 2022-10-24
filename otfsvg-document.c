@@ -506,10 +506,13 @@ struct otfsvg_document {
     hashmap_t* idcache;
     heap_t* heap;
     otfsvg_canvas_t* canvas;
+    void* canvas_data;
+    otfsvg_palette_func_t palette_func;
+    void* palette_data;
     otfsvg_path_t path;
     otfsvg_paint_t paint;
     otfsvg_stroke_data_t strokedata;
-    otfsvg_color_t color;
+    otfsvg_color_t current_color;
     float width;
     float height;
     float dpi;
@@ -1338,7 +1341,7 @@ static bool parse_path(const element_t* element, int id, otfsvg_path_t* path)
                 c[3] += current_y;
             }
 
-            otfsvg_path_quad_to(path, c[0], c[1], c[2], c[3]);
+            otfsvg_path_quad_to(path, current_x, current_y, c[0], c[1], c[2], c[3]);
             last_control_x = c[0];
             last_control_y = c[1];
             current_x = c[2];
@@ -1370,7 +1373,7 @@ static bool parse_path(const element_t* element, int id, otfsvg_path_t* path)
                 c[3] += current_y;
             }
 
-            otfsvg_path_quad_to(path, c[0], c[1], c[2], c[3]);
+            otfsvg_path_quad_to(path, current_x, current_y, c[0], c[1], c[2], c[3]);
             last_control_x = c[0];
             last_control_y = c[1];
             current_x = c[2];
@@ -1611,44 +1614,43 @@ typedef struct {
     bool compositing;
 } render_state_t;
 
-bool canvas_fill_path(const otfsvg_document_t* document, const render_state_t* state, otfsvg_fill_rule_t winding)
+bool document_fill_path(const otfsvg_document_t* document, const render_state_t* state, otfsvg_fill_rule_t winding)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->fill_path)
-        return canvas->fill_path(canvas, &document->path, &state->matrix, winding, &document->paint);
+        return canvas->fill_path(document->canvas_data, &document->path, &state->matrix, winding, &document->paint);
     return false;
 }
 
-bool canvas_stroke_path(const otfsvg_document_t* document, const render_state_t* state)
+bool document_stroke_path(const otfsvg_document_t* document, const render_state_t* state)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->stroke_path)
-        return canvas->stroke_path(canvas, &document->path, &state->matrix, &document->strokedata, &document->paint);
+        return canvas->stroke_path(document->canvas_data, &document->path, &state->matrix, &document->strokedata, &document->paint);
     return false;
 }
 
-bool canvas_push_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
+bool document_push_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->push_group)
-        return canvas->push_group(canvas, opacity, mode);
+        return canvas->push_group(document->canvas_data, opacity, mode);
     return false;
 }
 
-bool canvas_pop_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
+bool document_pop_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->pop_group)
-        return canvas->pop_group(canvas, opacity, mode);
+        return canvas->pop_group(document->canvas_data, opacity, mode);
     return false;
 }
 
-bool canvas_get_palette(otfsvg_document_t* document, const string_t* id, otfsvg_color_t* color)
+bool document_get_palette(otfsvg_document_t* document, const string_t* id, otfsvg_color_t* color)
 {
-    otfsvg_canvas_t* canvas = document->canvas;
-    if(canvas && canvas->get_palette)
-        return canvas->get_palette(canvas, id->data, id->length, color);
-    return false;
+    if(document->palette_func == NULL)
+        return false;
+    return document->palette_func(document->palette_data, id->data, id->length, color);
 }
 
 static const element_t* resolve_iri(const otfsvg_document_t* document, const element_t* element, int id);
@@ -1673,7 +1675,7 @@ static void render_state_begin(otfsvg_document_t* document, render_state_t* stat
     if(newstate->mode == render_mode_bounding)
         return;
     if(mode == otfsvg_blend_mode_dst_in || newstate->clippath || (opacity < 1.f && element->firstchild)) {
-        canvas_push_group(document, opacity, mode);
+        document_push_group(document, opacity, mode);
         newstate->compositing = true;
     }
 }
@@ -1685,7 +1687,7 @@ static void render_state_end(otfsvg_document_t* document, render_state_t* state,
     if(newstate->clippath)
         render_clip_path(document, newstate, newstate->clippath);
     if(newstate->compositing)
-        canvas_pop_group(document, newstate->opacity, mode);
+        document_pop_group(document, newstate->opacity, mode);
 
     otfsvg_matrix_t matrix = state->matrix;
     otfsvg_matrix_invert(&matrix);
@@ -1730,7 +1732,7 @@ static otfsvg_color_t resolve_color(const otfsvg_document_t* document, const col
 {
     otfsvg_color_t value = color->value;
     if(color->type == color_type_current)
-        value = document->color;
+        value = document->current_color;
     uint32_t rgb = value & 0x00FFFFFF;
     uint32_t a = opacity * otfsvg_alpha_channel(value);
     return (rgb | a << 24);
@@ -1971,7 +1973,7 @@ static bool resolve_paint(otfsvg_document_t* document, render_state_t* state, co
 
     if(paint->type == paint_type_var) {
         color_t color = {color_type_fixed, otfsvg_transparent_color};
-        if(!canvas_get_palette(document, &paint->id, &color.value))
+        if(!document_get_palette(document, &paint->id, &color.value))
             color = paint->color;
         document->paint.type = otfsvg_paint_type_color;
         document->paint.color = resolve_color(document, &color, opacity);;
@@ -2092,19 +2094,19 @@ static void document_draw(otfsvg_document_t* document, render_state_t* state)
 
         document->paint.type = otfsvg_paint_type_color;
         document->paint.color = otfsvg_black_color;
-        canvas_fill_path(document, state, winding);
+        document_fill_path(document, state, winding);
         return;
     }
 
     if(resolve_fill(document, state)) {
         otfsvg_fill_rule_t winding = otfsvg_fill_rule_non_zero;
         parse_winding(element, ID_FILL_RULE, &winding);
-        canvas_fill_path(document, state, winding);
+        document_fill_path(document, state, winding);
     }
 
     if(resolve_stroke(document, state)) {
         resolve_stroke_data(document, state);
-        canvas_stroke_path(document, state);
+        document_stroke_path(document, state);
     }
 }
 
@@ -2716,12 +2718,15 @@ float otfsvg_document_height(const otfsvg_document_t* document)
     return document->height;
 }
 
-bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, otfsvg_color_t color, const char* id)
+bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, void* canvas_data, otfsvg_palette_func_t palette_func, void* palette_data, otfsvg_color_t current_color, const char* id)
 {
     if(document->root == NULL)
         return false;
     document->canvas = canvas;
-    document->color =  color;
+    document->canvas_data = canvas_data;
+    document->palette_func = palette_func;
+    document->palette_data = palette_data;
+    document->current_color =  current_color;
 
     render_state_t state;
     state.mode = render_mode_display;
@@ -2747,7 +2752,10 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
     if(document->root == NULL)
         return false;
     document->canvas = NULL;
-    document->color = otfsvg_black_color;
+    document->canvas_data = NULL;
+    document->palette_func = NULL;
+    document->palette_data = NULL;
+    document->current_color =  otfsvg_black_color;
 
     render_state_t state;
     state.mode = render_mode_bounding;

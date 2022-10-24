@@ -212,21 +212,13 @@ void otfsvg_path_line_to(otfsvg_path_t* path, float x, float y)
     path->points.size += 1;
 }
 
-void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2)
+void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)
 {
-    otfsvg_array_ensure(path->elements, 1);
-    otfsvg_array_ensure(path->points, 2);
-
-    path->elements.data[path->elements.size] = otfsvg_path_element_quad_to;
-    path->elements.size += 1;
-
-    path->points.data[path->points.size].x = x1;
-    path->points.data[path->points.size].y = y1;
-    path->points.size += 1;
-
-    path->points.data[path->points.size].x = x2;
-    path->points.data[path->points.size].y = y2;
-    path->points.size += 1;
+    float cx1 = 2.f / 3.f * x2 + 1.f / 3.f * x1;
+    float cy1 = 2.f / 3.f * y2 + 1.f / 3.f * y1;
+    float cx2 = 2.f / 3.f * x2 + 1.f / 3.f * x3;
+    float cy2 = 2.f / 3.f * y2 + 1.f / 3.f * y3;
+    otfsvg_path_cubic_to(path, cx1, cy1, cx2, cy2, x1, y1);
 }
 
 void otfsvg_path_cubic_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)

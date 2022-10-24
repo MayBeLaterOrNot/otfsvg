@@ -27,7 +27,7 @@ void otfsvg_path_init(otfsvg_path_t* path);
 void otfsvg_path_destroy(otfsvg_path_t* path);
 void otfsvg_path_move_to(otfsvg_path_t* path, float x, float y);
 void otfsvg_path_line_to(otfsvg_path_t* path, float x, float y);
-void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2);
+void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
 void otfsvg_path_cubic_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
 void otfsvg_path_arc_to(otfsvg_path_t* path, float cx, float cy, float rx, float ry, float angle, bool large_arc_flag, bool sweep_flag, float x, float y);
 void otfsvg_path_close(otfsvg_path_t* path);

@@ -52,7 +52,6 @@ typedef struct {
 typedef enum {
     otfsvg_path_element_move_to,
     otfsvg_path_element_line_to,
-    otfsvg_path_element_quad_to,
     otfsvg_path_element_cubic_to,
     otfsvg_path_element_close
 } otfsvg_path_element_t;
@@ -88,8 +87,8 @@ typedef enum {
 } otfsvg_spread_method_t;
 
 typedef struct {
-    otfsvg_color_t color;
     float offset;
+    otfsvg_color_t color;
 } otfsvg_gradient_stop_t;
 
 typedef enum {
@@ -162,26 +161,22 @@ typedef struct {
     int height;
 } otfsvg_image_t;
 
-typedef struct otfsvg_canvas otfsvg_canvas_t;
+typedef bool(*otfsvg_palette_func_t)(void* userdata, const char* name, size_t length, otfsvg_color_t* color);
+typedef bool(*otfsvg_fill_path_func_t)(void* userdata, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, otfsvg_fill_rule_t winding, const otfsvg_paint_t* paint);
+typedef bool(*otfsvg_stroke_path_func_t)(void* userdata, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, const otfsvg_stroke_data_t* strokedata, const otfsvg_paint_t* paint);
+typedef bool(*otfsvg_push_group_func_t)(void* userdata, float opacity, otfsvg_blend_mode_t mode);
+typedef bool(*otfsvg_pop_group_func_t)(void* userdata, float opacity, otfsvg_blend_mode_t mode);
+typedef bool(*otfsvg_decode_image_func_t)(void* userdata, const char* data, size_t length, otfsvg_image_t* image);
+typedef bool(*otfsvg_draw_image_func_t)(void* userdata, const otfsvg_image_t* image, const otfsvg_matrix_t* matrix, const otfsvg_rect_t* rect, float opacity);
 
-typedef bool(*otfsvg_canvas_fill_path_func_t)(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, otfsvg_fill_rule_t winding, const otfsvg_paint_t* paint);
-typedef bool(*otfsvg_canvas_stroke_path_func_t)(otfsvg_canvas_t* canvas, const otfsvg_path_t* path, const otfsvg_matrix_t* matrix, const otfsvg_stroke_data_t* strokedata, const otfsvg_paint_t* paint);
-typedef bool(*otfsvg_canvas_push_group_func_t)(otfsvg_canvas_t* canvas, float opacity, otfsvg_blend_mode_t mode);
-typedef bool(*otfsvg_canvas_pop_group_func_t)(otfsvg_canvas_t* canvas, float opacity, otfsvg_blend_mode_t mode);
-typedef bool(*otfsvg_canvas_draw_image_func_t)(otfsvg_canvas_t* canvas, const otfsvg_image_t* image, const otfsvg_matrix_t* matrix, const otfsvg_rect_t* rect, float opacity);
-typedef bool(*otfsvg_canvas_decode_image_func_t)(otfsvg_canvas_t* canvas, const char* data, size_t length, otfsvg_image_t* image);
-typedef bool(*otfsvg_canvas_get_palette_func_t)(otfsvg_canvas_t* canvas, const char* name, size_t length, otfsvg_color_t* color);
-
-struct otfsvg_canvas {
-    void* data;
-    otfsvg_canvas_fill_path_func_t fill_path;
-    otfsvg_canvas_stroke_path_func_t stroke_path;
-    otfsvg_canvas_push_group_func_t push_group;
-    otfsvg_canvas_pop_group_func_t pop_group;
-    otfsvg_canvas_draw_image_func_t draw_image;
-    otfsvg_canvas_decode_image_func_t decode_image;
-    otfsvg_canvas_get_palette_func_t get_palette;
-};
+typedef struct {
+    otfsvg_fill_path_func_t fill_path;
+    otfsvg_stroke_path_func_t stroke_path;
+    otfsvg_push_group_func_t push_group;
+    otfsvg_pop_group_func_t pop_group;
+    otfsvg_decode_image_func_t decode_image;
+    otfsvg_draw_image_func_t draw_image;
+} otfsvg_canvas_t;
 
 typedef struct otfsvg_document otfsvg_document_t;
 
@@ -192,8 +187,8 @@ void otfsvg_document_destory(otfsvg_document_t* document);
 bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t length, float width, float height, float dpi);
 float otfsvg_document_width(const otfsvg_document_t* document);
 float otfsvg_document_height(const otfsvg_document_t* document);
-bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, otfsvg_color_t color, const char* id);
 bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, const char* id);
+bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, void* canvas_data, otfsvg_palette_func_t palette_func, void* palette_data, otfsvg_color_t current_color, const char* id);
 
 #ifdef __cplusplus
 }
