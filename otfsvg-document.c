@@ -1140,7 +1140,7 @@ static int parse_view_box(const element_t* element, int id, otfsvg_rect_t* viewb
     viewbox->y = y;
     viewbox->w = w;
     viewbox->h = h;
-    return false;
+    return true;
 }
 
 typedef enum {
