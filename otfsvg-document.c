@@ -7,220 +7,12 @@
 #include <ctype.h>
 #include <assert.h>
 
-typedef struct {
-    const char* data;
-    size_t length;
-} string_t;
-
-typedef struct property {
-    int id;
-    string_t value;
-    struct property* next;
-} property_t;
-
-typedef struct element {
-    int id;
-    struct element* parent;
-    struct element* nextchild;
-    struct element* lastchild;
-    struct element* firstchild;
-    struct property* property;
-} element_t;
-
-typedef struct heap_chunk {
-    struct heap_chunk* next;
-} heap_chunk_t;
-
-typedef struct {
-    heap_chunk_t* chunk;
-    heap_chunk_t* freedchunk;
-    size_t size;
-} heap_t;
-
-static heap_t* heap_create(void)
-{
-    heap_t* heap = malloc(sizeof(heap_t));
-    heap->chunk = NULL;
-    heap->freedchunk = NULL;
-    heap->size = 0;
-    return heap;
-}
-
-#define CHUNK_SIZE 4096
-#define ALIGN_SIZE(size) (((size) + 7ul) & ~7ul)
-static void* heap_alloc(heap_t* heap, size_t size)
-{
-    if(heap->chunk == NULL || heap->size + ALIGN_SIZE(size) > CHUNK_SIZE) {
-        heap_chunk_t* chunk = heap->freedchunk;
-        if(chunk == NULL) {
-            chunk = malloc(sizeof(heap_chunk_t) + CHUNK_SIZE);
-        } else {
-            heap->freedchunk = chunk->next;
-        }
-
-        chunk->next = heap->chunk;
-        heap->chunk = chunk;
-        heap->size = 0;
-    }
-
-    void* data = (char*)(heap->chunk) + sizeof(heap_chunk_t) + heap->size;
-    heap->size += ALIGN_SIZE(size);
-    return data;
-}
-
-static void heap_clear(heap_t* heap)
-{
-    heap->freedchunk = heap->chunk;
-    heap->chunk = NULL;
-    heap->size = 0;
-}
-
-static void heap_destroy(heap_t* heap)
-{
-    while(heap->chunk) {
-        heap_chunk_t* chunk = heap->chunk;
-        heap->chunk = chunk->next;
-        free(chunk);
-    }
-
-    while(heap->freedchunk) {
-        heap_chunk_t* chunk = heap->freedchunk;
-        heap->freedchunk = chunk->next;
-        free(chunk);
-    }
-
-    free(heap);
-}
-
-typedef struct hashmap_entry {
-    size_t hash;
-    string_t name;
-    void* value;
-    struct hashmap_entry* next;
-} hashmap_entry_t;
-
-typedef struct {
-    hashmap_entry_t** buckets;
-    size_t size;
-    size_t capacity;
-} hashmap_t;
-
-static hashmap_t* hashmap_create(void)
-{
-    hashmap_t* map = malloc(sizeof(hashmap_t));
-    map->buckets = calloc(16, sizeof(hashmap_entry_t*));
-    map->size = 0;
-    map->capacity = 16;
-    return map;
-}
-
-static size_t hashmap_hash(const char* data, size_t length)
-{
-    size_t h = length;
-    for(int i = 0; i < length; i++) {
-        h = h * 31 + *data;
-        ++data;
-    }
-
-    return h;
-}
-
-static bool hashmap_eq(const hashmap_entry_t* entry, const char* data, size_t length)
-{
-    const string_t* name = &entry->name;
-    if(name->length != length)
-        return false;
-    for(int i = 0; i < length; i++) {
-        if(data[i] != name->data[i]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static void hashmap_expand(hashmap_t* map)
-{
-    if(map->size > (map->capacity * 3 / 4)) {
-        size_t newcapacity = map->capacity << 1;
-        hashmap_entry_t** newbuckets = calloc(newcapacity, sizeof(hashmap_entry_t*));
-        for(int i = 0; i < map->capacity; i++) {
-            hashmap_entry_t* entry = map->buckets[i];
-            while(entry) {
-                hashmap_entry_t* next = entry->next;
-                size_t index = entry->hash & (newcapacity - 1);
-                entry->next = newbuckets[index];
-                newbuckets[index] = entry;
-                entry = next;
-            }
-        }
-
-        free(map->buckets);
-        map->buckets = newbuckets;
-        map->capacity = newcapacity;
-    }
-}
-
-static void hashmap_put(hashmap_t* map, heap_t* heap, const char* data, size_t length, void* value)
-{
-    size_t hash = hashmap_hash(data, length);
-    size_t index = hash & (map->capacity - 1);
-
-    hashmap_entry_t** p = &map->buckets[index];
-    while(true) {
-        hashmap_entry_t* current = *p;
-        if(current == NULL) {
-            hashmap_entry_t* entry = heap_alloc(heap, sizeof(hashmap_entry_t));
-            entry->name.data = data;
-            entry->name.length = length;
-            entry->hash = hash;
-            entry->value = value;
-            entry->next = NULL;
-            *p = entry;
-            map->size += 1;
-            hashmap_expand(map);
-            break;
-        }
-
-        if(current->hash == hash && hashmap_eq(current, data, length)) {
-            current->value = value;
-            break;
-        }
-
-        p = &current->next;
-    }
-}
-
-static void* hashmap_get(const hashmap_t* map, const char* data, size_t length)
-{
-    size_t hash = hashmap_hash(data, length);
-    size_t index = hash & (map->capacity - 1);
-
-    hashmap_entry_t* entry = map->buckets[index];
-    while(entry) {
-        if(entry->hash == hash && hashmap_eq(entry, data, length))
-            return entry->value;
-        entry = entry->next;
-    }
-
-    return NULL;
-}
-
-static void hashmap_clear(hashmap_t* map)
-{
-    memset(map->buckets, 0, map->capacity * sizeof(hashmap_entry_t*));
-    map->size = 0;
-}
-
-static void hashmap_destroy(hashmap_t* map)
-{
-    free(map->buckets);
-    free(map);
-}
-
 #define IS_ALPHA(c) (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 #define IS_NUM(c) (c >= '0' && c <= '9')
 #define IS_WS(c) (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+#define IS_STARTNAMECHAR(c) (IS_ALPHA(c) ||  c == '_' || c == ':')
+#define IS_NAMECHAR(c) (IS_STARTNAMECHAR(c) || IS_NUM(c) || c == '-' || c == '.')
+
 static inline bool skip_string(const char** begin, const char* end, const char* data)
 {
     const char* it = *begin;
@@ -501,6 +293,217 @@ static int elementid(const char* data, size_t length)
     return entry->id;
 }
 
+typedef struct {
+    const char* data;
+    size_t length;
+} string_t;
+
+typedef struct property {
+    int id;
+    string_t value;
+    struct property* next;
+} property_t;
+
+typedef struct element {
+    int id;
+    struct element* parent;
+    struct element* nextchild;
+    struct element* lastchild;
+    struct element* firstchild;
+    struct property* property;
+} element_t;
+
+typedef struct heap_chunk {
+    struct heap_chunk* next;
+} heap_chunk_t;
+
+typedef struct {
+    heap_chunk_t* chunk;
+    heap_chunk_t* freedchunk;
+    size_t size;
+} heap_t;
+
+static heap_t* heap_create(void)
+{
+    heap_t* heap = malloc(sizeof(heap_t));
+    heap->chunk = NULL;
+    heap->freedchunk = NULL;
+    heap->size = 0;
+    return heap;
+}
+
+#define CHUNK_SIZE 4096
+#define ALIGN_SIZE(size) (((size) + 7ul) & ~7ul)
+static void* heap_alloc(heap_t* heap, size_t size)
+{
+    if(heap->chunk == NULL || heap->size + ALIGN_SIZE(size) > CHUNK_SIZE) {
+        heap_chunk_t* chunk = heap->freedchunk;
+        if(chunk == NULL) {
+            chunk = malloc(sizeof(heap_chunk_t) + CHUNK_SIZE);
+        } else {
+            heap->freedchunk = chunk->next;
+        }
+
+        chunk->next = heap->chunk;
+        heap->chunk = chunk;
+        heap->size = 0;
+    }
+
+    void* data = (char*)(heap->chunk) + sizeof(heap_chunk_t) + heap->size;
+    heap->size += ALIGN_SIZE(size);
+    return data;
+}
+
+static void heap_clear(heap_t* heap)
+{
+    heap->freedchunk = heap->chunk;
+    heap->chunk = NULL;
+    heap->size = 0;
+}
+
+static void heap_destroy(heap_t* heap)
+{
+    while(heap->chunk) {
+        heap_chunk_t* chunk = heap->chunk;
+        heap->chunk = chunk->next;
+        free(chunk);
+    }
+
+    while(heap->freedchunk) {
+        heap_chunk_t* chunk = heap->freedchunk;
+        heap->freedchunk = chunk->next;
+        free(chunk);
+    }
+
+    free(heap);
+}
+
+typedef struct hashmap_entry {
+    size_t hash;
+    string_t name;
+    void* value;
+    struct hashmap_entry* next;
+} hashmap_entry_t;
+
+typedef struct {
+    hashmap_entry_t** buckets;
+    size_t size;
+    size_t capacity;
+} hashmap_t;
+
+static hashmap_t* hashmap_create(void)
+{
+    hashmap_t* map = malloc(sizeof(hashmap_t));
+    map->buckets = calloc(16, sizeof(hashmap_entry_t*));
+    map->size = 0;
+    map->capacity = 16;
+    return map;
+}
+
+static size_t hashmap_hash(const char* data, size_t length)
+{
+    size_t h = length;
+    for(int i = 0; i < length; i++) {
+        h = h * 31 + *data;
+        ++data;
+    }
+
+    return h;
+}
+
+static bool hashmap_eq(const hashmap_entry_t* entry, const char* data, size_t length)
+{
+    const string_t* name = &entry->name;
+    if(name->length != length)
+        return false;
+    for(int i = 0; i < length; i++) {
+        if(data[i] != name->data[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void hashmap_expand(hashmap_t* map)
+{
+    if(map->size > (map->capacity * 3 / 4)) {
+        size_t newcapacity = map->capacity << 1;
+        hashmap_entry_t** newbuckets = calloc(newcapacity, sizeof(hashmap_entry_t*));
+        for(int i = 0; i < map->capacity; i++) {
+            hashmap_entry_t* entry = map->buckets[i];
+            while(entry) {
+                hashmap_entry_t* next = entry->next;
+                size_t index = entry->hash & (newcapacity - 1);
+                entry->next = newbuckets[index];
+                newbuckets[index] = entry;
+                entry = next;
+            }
+        }
+
+        free(map->buckets);
+        map->buckets = newbuckets;
+        map->capacity = newcapacity;
+    }
+}
+
+static void hashmap_put(hashmap_t* map, heap_t* heap, const char* data, size_t length, void* value)
+{
+    size_t hash = hashmap_hash(data, length);
+    size_t index = hash & (map->capacity - 1);
+
+    hashmap_entry_t** p = &map->buckets[index];
+    while(true) {
+        hashmap_entry_t* current = *p;
+        if(current == NULL) {
+            hashmap_entry_t* entry = heap_alloc(heap, sizeof(hashmap_entry_t));
+            entry->name.data = data;
+            entry->name.length = length;
+            entry->hash = hash;
+            entry->value = value;
+            entry->next = NULL;
+            *p = entry;
+            map->size += 1;
+            hashmap_expand(map);
+            break;
+        }
+
+        if(current->hash == hash && hashmap_eq(current, data, length)) {
+            current->value = value;
+            break;
+        }
+
+        p = &current->next;
+    }
+}
+
+static void* hashmap_get(const hashmap_t* map, const char* data, size_t length)
+{
+    size_t hash = hashmap_hash(data, length);
+    size_t index = hash & (map->capacity - 1);
+
+    hashmap_entry_t* entry = map->buckets[index];
+    while(entry) {
+        if(entry->hash == hash && hashmap_eq(entry, data, length))
+            return entry->value;
+        entry = entry->next;
+    }
+
+    return NULL;
+}
+
+static void hashmap_clear(hashmap_t* map)
+{
+    memset(map->buckets, 0, map->capacity * sizeof(hashmap_entry_t*));
+    map->size = 0;
+}
+
+static void hashmap_destroy(hashmap_t* map)
+{
+    free(map->buckets);
+    free(map);
+}
+
 struct otfsvg_document {
     element_t* root;
     hashmap_t* idcache;
@@ -518,54 +521,48 @@ struct otfsvg_document {
     float dpi;
 };
 
-#define IS_STARTNAMECHAR(c) (IS_ALPHA(c) ||  c == '_' || c == ':')
-#define IS_NAMECHAR(c) (IS_STARTNAMECHAR(c) || IS_NUM(c) || c == '-' || c == '.')
-static bool parse_attributes(const char** begin, const char* end, otfsvg_document_t* document, element_t* element)
+static inline const string_t* property_get(const element_t* element, int id)
 {
-    const char* it = *begin;
-    while(it < end && IS_STARTNAMECHAR(*it)) {
-        const char* begin = it;
-        ++it;
-        while(it < end && IS_NAMECHAR(*it))
-            ++it;
-
-        int id = propertyid(begin, it - begin);
-        skip_ws(&it, end);
-        if(it >= end || *it != '=')
-            return false;
-
-        ++it;
-        skip_ws(&it, end);
-        if(it >= end || (*it != '"' && *it != '\''))
-            return false;
-
-        const char quote = *it;
-        ++it;
-        skip_ws(&it, end);
-        begin = it;
-        while(it < end && *it != quote)
-            ++it;
-        if(it >= end || *it != quote)
-            return false;
-        if(id && element) {
-            if(id == ID_ID) {
-                hashmap_put(document->idcache, document->heap, begin, it - begin, element);
-            } else {
-                property_t* property = heap_alloc(document->heap, sizeof(property_t));
-                property->id = id;
-                property->value.data = begin;
-                property->value.length = it - begin;
-                property->next = element->property;
-                element->property = property;
-            }
-        }
-
-        ++it;
-        skip_ws(&it, end);
+    const property_t* property = element->property;
+    while(property != NULL) {
+        if(property->id == id)
+            return &property->value;
+        property = property->next;
     }
 
-    *begin = it;
-    return true;
+    return NULL;
+}
+
+static inline const string_t* property_find(const element_t* element, int id)
+{
+    while(element != NULL) {
+        const string_t* value = property_get(element, id);
+        if(value != NULL)
+            return value;
+        element = element->parent;
+    }
+
+    return NULL;
+}
+
+static inline bool property_has(const element_t* element, int id)
+{
+    const property_t* property = element->property;
+    while(property != NULL) {
+        if(property->id == id)
+            return true;
+        property = property->next;
+    }
+
+    return false;
+}
+
+static inline const string_t* property_search(const element_t* element, int id, bool inherit)
+{
+    const string_t* value = property_get(element, id);
+    if(value == NULL && inherit)
+        return property_find(element->parent, id);
+    return value;
 }
 
 static inline bool parse_float(const char** begin, const char* end, float* number)
@@ -626,50 +623,6 @@ static inline bool parse_float(const char** begin, const char* end, float* numbe
     if(exponent)
         *number *= powf(10.0, expsign * exponent);
     return *number >= -FLT_MAX && *number <= FLT_MAX;
-}
-
-static inline const string_t* property_get(const element_t* element, int id)
-{
-    const property_t* property = element->property;
-    while(property != NULL) {
-        if(property->id == id)
-            return &property->value;
-        property = property->next;
-    }
-
-    return NULL;
-}
-
-static inline const string_t* property_find(const element_t* element, int id)
-{
-    while(element != NULL) {
-        const string_t* value = property_get(element, id);
-        if(value != NULL)
-            return value;
-        element = element->parent;
-    }
-
-    return NULL;
-}
-
-static inline bool property_has(const element_t* element, int id)
-{
-    const property_t* property = element->property;
-    while(property != NULL) {
-        if(property->id == id)
-            return true;
-        property = property->next;
-    }
-
-    return false;
-}
-
-static inline const string_t* property_search(const element_t* element, int id, bool inherit)
-{
-    const string_t* value = property_get(element, id);
-    if(value == NULL && inherit)
-        return property_find(element->parent, id);
-    return value;
 }
 
 static bool parse_number(const element_t* element, int id, float* number, bool percent, bool inherit)
@@ -1047,7 +1000,8 @@ static bool parse_color_value(const char** begin, const char* end, color_t* colo
     return true;
 }
 
-static bool parse_color(const element_t* element, int id, color_t* color) {
+static bool parse_color(const element_t* element, int id, color_t* color)
+{
     const string_t* value = property_find(element, id);
     if(value == NULL)
         return false;
@@ -1614,7 +1568,7 @@ typedef struct {
     bool compositing;
 } render_state_t;
 
-bool document_fill_path(const otfsvg_document_t* document, const render_state_t* state, otfsvg_fill_rule_t winding)
+static bool document_fill_path(const otfsvg_document_t* document, const render_state_t* state, otfsvg_fill_rule_t winding)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->fill_path)
@@ -1622,7 +1576,7 @@ bool document_fill_path(const otfsvg_document_t* document, const render_state_t*
     return false;
 }
 
-bool document_stroke_path(const otfsvg_document_t* document, const render_state_t* state)
+static bool document_stroke_path(const otfsvg_document_t* document, const render_state_t* state)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->stroke_path)
@@ -1630,7 +1584,7 @@ bool document_stroke_path(const otfsvg_document_t* document, const render_state_
     return false;
 }
 
-bool document_push_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
+static bool document_push_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->push_group)
@@ -1638,7 +1592,7 @@ bool document_push_group(otfsvg_document_t* document, float opacity, otfsvg_blen
     return false;
 }
 
-bool document_pop_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
+static bool document_pop_group(otfsvg_document_t* document, float opacity, otfsvg_blend_mode_t mode)
 {
     otfsvg_canvas_t* canvas = document->canvas;
     if(canvas && canvas->pop_group)
@@ -1646,7 +1600,7 @@ bool document_pop_group(otfsvg_document_t* document, float opacity, otfsvg_blend
     return false;
 }
 
-bool document_get_palette(otfsvg_document_t* document, const string_t* id, otfsvg_color_t* color)
+static bool document_get_palette(otfsvg_document_t* document, const string_t* id, otfsvg_color_t* color)
 {
     if(document->palette_func == NULL)
         return false;
@@ -2486,17 +2440,17 @@ static void render_children(otfsvg_document_t* document, render_state_t* state, 
 otfsvg_document_t* otfsvg_document_create(void)
 {
     otfsvg_document_t* document = malloc(sizeof(otfsvg_document_t));
-    document->root = NULL;
-    document->idcache = hashmap_create();
-    document->heap = heap_create();
-    document->width = 0.f;
-    document->height = 0.f;
-    document->dpi = 96.f;
-    document->canvas = NULL;
     otfsvg_array_init(document->path.elements);
     otfsvg_array_init(document->path.points);
     otfsvg_array_init(document->paint.gradient.stops);
     otfsvg_array_init(document->strokedata.dash);
+    document->idcache = hashmap_create();
+    document->heap = heap_create();
+    document->root = NULL;
+    document->width = 0.f;
+    document->height = 0.f;
+    document->dpi = 96.f;
+    document->canvas = NULL;
     return document;
 }
 
@@ -2513,9 +2467,59 @@ void otfsvg_document_destory(otfsvg_document_t* document)
 
 void otfsvg_document_clear(otfsvg_document_t* document)
 {
-    document->root = NULL;
     hashmap_clear(document->idcache);
     heap_clear(document->heap);
+    document->root = NULL;
+    document->width = 0.f;
+    document->height = 0.f;
+}
+
+static bool parse_attributes(const char** begin, const char* end, otfsvg_document_t* document, element_t* element)
+{
+    const char* it = *begin;
+    while(it < end && IS_STARTNAMECHAR(*it)) {
+        const char* begin = it;
+        ++it;
+        while(it < end && IS_NAMECHAR(*it))
+            ++it;
+
+        int id = propertyid(begin, it - begin);
+        skip_ws(&it, end);
+        if(it >= end || *it != '=')
+            return false;
+
+        ++it;
+        skip_ws(&it, end);
+        if(it >= end || (*it != '"' && *it != '\''))
+            return false;
+
+        const char quote = *it;
+        ++it;
+        skip_ws(&it, end);
+        begin = it;
+        while(it < end && *it != quote)
+            ++it;
+        if(it >= end || *it != quote)
+            return false;
+        if(id && element) {
+            if(id == ID_ID) {
+                hashmap_put(document->idcache, document->heap, begin, it - begin, element);
+            } else {
+                property_t* property = heap_alloc(document->heap, sizeof(property_t));
+                property->id = id;
+                property->value.data = begin;
+                property->value.length = it - begin;
+                property->next = element->property;
+                element->property = property;
+            }
+        }
+
+        ++it;
+        skip_ws(&it, end);
+    }
+
+    *begin = it;
+    return true;
 }
 
 bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t length, float width, float height, float dpi)
@@ -2694,6 +2698,7 @@ bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t 
     if(parse_view_box(document->root, ID_VIEWBOX, &viewbox)) {
         document->width = viewbox.w;
         document->height = viewbox.h;
+        document->dpi = dpi;
     } else {
         length_t w = {100, length_type_percent};
         length_t h = {100, length_type_percent};
@@ -2703,6 +2708,7 @@ bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t 
 
         document->width = convert_length(&w, width, dpi);
         document->height = convert_length(&h, height, dpi);
+        document->dpi = dpi;
     }
 
     return true;
@@ -2726,7 +2732,7 @@ bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas
     document->canvas_data = canvas_data;
     document->palette_func = palette_func;
     document->palette_data = palette_data;
-    document->current_color =  current_color;
+    document->current_color = current_color;
 
     render_state_t state;
     state.mode = render_mode_display;
@@ -2755,7 +2761,7 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
     document->canvas_data = NULL;
     document->palette_func = NULL;
     document->palette_data = NULL;
-    document->current_color =  otfsvg_black_color;
+    document->current_color = otfsvg_black_color;
 
     render_state_t state;
     state.mode = render_mode_bounding;

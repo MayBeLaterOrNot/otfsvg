@@ -279,7 +279,7 @@ static bool popGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
 int main(int argc, char* argv[])
 {
     if(argc != 3 && argc != 4) {
-        printf("Invalid number of arguments\n");
+        printf("usage : otfsvg-dump input output [id]\n");
         return -1;
     }
 

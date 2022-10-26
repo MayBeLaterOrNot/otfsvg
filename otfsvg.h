@@ -71,10 +71,10 @@ typedef struct {
 
 typedef unsigned int otfsvg_color_t;
 
-#define otfsvg_alpha_channel(c) (((c) >> 24) & 0xFF)
 #define otfsvg_blue_channel(c) (((c) >> 0) & 0xFF)
 #define otfsvg_green_channel(c) (((c) >> 8) & 0xFF)
 #define otfsvg_red_channel(c) (((c) >> 16) & 0xFF)
+#define otfsvg_alpha_channel(c) (((c) >> 24) & 0xFF)
 
 #define otfsvg_black_color 0xFF000000
 #define otfsvg_white_color 0xFFFFFFFF
@@ -156,7 +156,7 @@ typedef struct {
 } otfsvg_stroke_data_t;
 
 typedef struct {
-    void* data;
+    void* userdata;
     int width;
     int height;
 } otfsvg_image_t;
