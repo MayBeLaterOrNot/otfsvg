@@ -84,23 +84,23 @@ static void writePath(render_context_t* context, const otfsvg_path_t* path)
 {
     writeIndent(context);
     writeString(context, "path : ");
-    const otfsvg_path_element_t* elements = path->elements.data;
+    const otfsvg_path_command_t* elements = path->commands.data;
     const otfsvg_point_t* points = path->points.data;
-    for(int i = 0; i < path->elements.size; ++i) {
+    for(int i = 0; i < path->commands.size; ++i) {
         switch(elements[i]) {
-        case otfsvg_path_element_move_to:
+        case otfsvg_path_command_move_to:
             writeF(context, "M%f %f", points[0].x, points[0].y);
             points += 1;
             break;
-        case otfsvg_path_element_line_to:
+        case otfsvg_path_command_line_to:
             writeF(context, "L%f %f", points[0].x, points[0].y);
             points += 1;
             break;
-        case otfsvg_path_element_cubic_to:
+        case otfsvg_path_command_cubic_to:
             writeF(context, "C%f %f %f %f %f %f", points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
             points += 3;
             break;
-        case otfsvg_path_element_close:
+        case otfsvg_path_command_close:
             writeChar(context, 'Z');
             break;
         }
@@ -148,15 +148,15 @@ static void writePaint(render_context_t* context, const otfsvg_paint_t* paint)
     newLine(context);
     writeTransform(context, &gradient->matrix);
     writeIndent(context);
-    writeString(context, "spread-method : ");
+    writeString(context, "gradient-spread : ");
     switch(gradient->spread) {
-    case otfsvg_spread_method_pad:
+    case otfsvg_gradient_spread_pad:
         writeString(context, "pad");
         break;
-    case otfsvg_spread_method_reflect:
+    case otfsvg_gradient_spread_reflect:
         writeString(context, "reflect");
         break;
-    case otfsvg_spread_method_repeat:
+    case otfsvg_gradient_spread_repeat:
         writeString(context, "repeat");
         break;
     }
@@ -200,11 +200,11 @@ static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_
     writePath(context, path);
     writeTransform(context, matrix);
     writeIndent(context);
-    writeF(context, "line-width : %f", strokedata->width);
+    writeF(context, "line-width : %f", strokedata->linewidth);
     newLine(context);
     writeIndent(context);
     writeString(context, "line-cap : ");
-    switch(strokedata->cap) {
+    switch(strokedata->linecap) {
     case otfsvg_line_cap_butt:
         writeString(context, "butt");
         break;
@@ -219,7 +219,7 @@ static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_
     newLine(context);
     writeIndent(context);
     writeString(context, "line-join : ");
-    switch(strokedata->join) {
+    switch(strokedata->linejoin) {
     case otfsvg_line_join_miter:
         writeString(context, "miter");
         break;
@@ -234,14 +234,14 @@ static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_
     newLine(context);
     writeIndent(context);
     writeF(context, "miter-limit : %f", strokedata->miterlimit);
-    if(strokedata->dash.size > 0) {
+    if(strokedata->dasharray.size > 0) {
         newLine(context);
         writeIndent(context);
-        writeF(context, "dash-offset : %f", strokedata->dash.offset);
+        writeF(context, "dash-offset : %f", strokedata->dashoffset);
         newLine(context);
         writeString(context, "dash-array : ");
-        for(int i = 0; i < strokedata->dash.size; ++i) {
-            writeF(context, "%f ", strokedata->dash.data[i]);
+        for(int i = 0; i < strokedata->dasharray.size; ++i) {
+            writeF(context, "%f ", strokedata->dasharray.data[i]);
         }
     }
 

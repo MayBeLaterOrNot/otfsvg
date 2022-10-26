@@ -144,7 +144,7 @@ enum {
     ID_RY,
     ID_SOLID_COLOR,
     ID_SOLID_OPACITY,
-    ID_SPREAD_METHOD,
+    ID_gradient_spread,
     ID_STOP_COLOR,
     ID_STOP_OPACITY,
     ID_STROKE,
@@ -196,7 +196,7 @@ static const name_entry_t propertymap[] = {
     {"ry", ID_RY},
     {"solid-color", ID_SOLID_COLOR},
     {"solid-opacity", ID_SOLID_OPACITY},
-    {"spreadMethod", ID_SPREAD_METHOD},
+    {"spreadMethod", ID_gradient_spread},
     {"stop-color", ID_STOP_COLOR},
     {"stop-opacity", ID_STOP_OPACITY},
     {"stroke", ID_STROKE},
@@ -1426,7 +1426,7 @@ static bool parse_points(const element_t* element, int id, otfsvg_path_t* path)
     return true;
 }
 
-static bool parse_line_cap(const element_t* element, int id, otfsvg_line_cap_t* cap)
+static bool parse_line_cap(const element_t* element, int id, otfsvg_line_cap_t* linecap)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1435,15 +1435,15 @@ static bool parse_line_cap(const element_t* element, int id, otfsvg_line_cap_t* 
     const char* it = value->data;
     const char* end = it + value->length;
     if(skip_string(&it, end, "round"))
-        *cap = otfsvg_line_cap_round;
+        *linecap = otfsvg_line_cap_round;
     else if(skip_string(&it, end, "square"))
-        *cap = otfsvg_line_cap_square;
+        *linecap = otfsvg_line_cap_square;
     else if(skip_string(&it, end, "butt"))
-        *cap = otfsvg_line_cap_butt;
+        *linecap = otfsvg_line_cap_butt;
     return !skip_ws(&it, end);
 }
 
-static bool parse_line_join(const element_t* element, int id, otfsvg_line_join_t* join)
+static bool parse_line_join(const element_t* element, int id, otfsvg_line_join_t* linejoin)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1452,11 +1452,11 @@ static bool parse_line_join(const element_t* element, int id, otfsvg_line_join_t
     const char* it = value->data;
     const char* end = it + value->length;
     if(skip_string(&it, end, "bevel"))
-        *join = otfsvg_line_join_bevel;
+        *linejoin = otfsvg_line_join_bevel;
     else if(skip_string(&it, end, "round"))
-        *join = otfsvg_line_join_round;
+        *linejoin = otfsvg_line_join_round;
     else if(skip_string(&it, end, "miter"))
-        *join = otfsvg_line_join_miter;
+        *linejoin = otfsvg_line_join_miter;
     return !skip_ws(&it, end);
 }
 
@@ -1475,7 +1475,7 @@ static bool parse_winding(const element_t* element, int id, otfsvg_fill_rule_t* 
     return !skip_ws(&it, end);
 }
 
-static bool parse_spread_method(const element_t* element, int id, otfsvg_spread_method_t* spread)
+static bool parse_gradient_spread(const element_t* element, int id, otfsvg_gradient_spread_t* spread)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL)
@@ -1484,11 +1484,11 @@ static bool parse_spread_method(const element_t* element, int id, otfsvg_spread_
     const char* it = value->data;
     const char* end = it + value->length;
     if(skip_string(&it, end, "reflect"))
-        *spread = otfsvg_spread_method_reflect;
+        *spread = otfsvg_gradient_spread_reflect;
     else if(skip_string(&it, end, "repeat"))
-        *spread = otfsvg_spread_method_repeat;
+        *spread = otfsvg_gradient_spread_repeat;
     else if(skip_string(&it, end, "pad"))
-        *spread = otfsvg_spread_method_pad;
+        *spread = otfsvg_gradient_spread_pad;
     return !skip_ws(&it, end);
 }
 
@@ -1745,7 +1745,7 @@ static void fill_gradient_elements(const element_t* current, const element_t** e
         elements[1] = current;
     if(elements[2] == NULL && property_has(current, ID_GRADIENT_UNITS))
         elements[2] = current;
-    if(elements[3] == NULL && property_has(current, ID_SPREAD_METHOD))
+    if(elements[3] == NULL && property_has(current, ID_gradient_spread))
         elements[3] = current;
 }
 
@@ -1789,12 +1789,12 @@ static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t*
 
     otfsvg_matrix_t matrix;
     units_type_t units = units_type_object_bounding_box;
-    otfsvg_spread_method_t spread = otfsvg_spread_method_pad;
+    otfsvg_gradient_spread_t spread = otfsvg_gradient_spread_pad;
 
     resolve_gradient_stops(document, gradient, opacity, elements[0]);
     parse_transform(elements[1], ID_GRADIENT_TRANSFORM, &matrix);
     parse_units(elements[2], ID_GRADIENT_UNITS, &units);
-    parse_spread_method(elements[3], ID_SPREAD_METHOD, &spread);
+    parse_gradient_spread(elements[3], ID_gradient_spread, &spread);
     if(units == units_type_object_bounding_box) {
         otfsvg_matrix_t m;
         otfsvg_matrix_init_translate(&m, state->bbox.x, state->bbox.y);
@@ -1866,12 +1866,12 @@ static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t*
 
     otfsvg_matrix_t matrix;
     units_type_t units = units_type_object_bounding_box;
-    otfsvg_spread_method_t spread = otfsvg_spread_method_pad;
+    otfsvg_gradient_spread_t spread = otfsvg_gradient_spread_pad;
 
     resolve_gradient_stops(document, gradient, opacity, elements[0]);
     parse_transform(elements[1], ID_GRADIENT_TRANSFORM, &matrix);
     parse_units(elements[2], ID_GRADIENT_UNITS, &units);
-    parse_spread_method(elements[3], ID_SPREAD_METHOD, &spread);
+    parse_gradient_spread(elements[3], ID_gradient_spread, &spread);
     if(units == units_type_object_bounding_box) {
         otfsvg_matrix_t m;
         otfsvg_matrix_init_translate(&m, state->bbox.x, state->bbox.y);
@@ -1974,27 +1974,27 @@ static bool resolve_stroke(otfsvg_document_t* document, render_state_t* state)
 static void resolve_stroke_data(otfsvg_document_t* document, render_state_t* state)
 {
     const element_t* element = state->element;
-    otfsvg_line_cap_t cap = otfsvg_line_cap_butt;
-    otfsvg_line_join_t join = otfsvg_line_join_miter;
+    otfsvg_line_cap_t linecap = otfsvg_line_cap_butt;
+    otfsvg_line_join_t linejoin = otfsvg_line_join_miter;
 
-    parse_line_cap(element, ID_STROKE_LINECAP, &cap);
-    parse_line_join(element, ID_STROKE_LINEJOIN, &join);
+    parse_line_cap(element, ID_STROKE_LINECAP, &linecap);
+    parse_line_join(element, ID_STROKE_LINEJOIN, &linejoin);
 
     float miterlimit = 4;
-    length_t width = {1, length_type_number};
+    length_t linewidth = {1, length_type_number};
     length_t dashoffset = {0, length_type_number};
 
     parse_number(element, ID_STROKE_MITERLIMIT, &miterlimit, false, true);
-    parse_length(element, ID_STROKE_WIDTH, &width, false, true);
+    parse_length(element, ID_STROKE_WIDTH, &linewidth, false, true);
     parse_length(element, ID_STROKE_DASHOFFSET, &dashoffset, true, true);
 
     otfsvg_stroke_data_t* strokedata = &document->strokedata;
-    strokedata->cap = cap;
-    strokedata->join = join;
+    strokedata->linecap = linecap;
+    strokedata->linejoin = linejoin;
     strokedata->miterlimit = miterlimit;
-    strokedata->width = resolve_length(document, &width, 'o');
-    strokedata->dash.offset = resolve_length(document, &dashoffset, 'o');
-    strokedata->dash.size = 0;
+    strokedata->linewidth = resolve_length(document, &linewidth, 'o');
+    strokedata->dashoffset = resolve_length(document, &dashoffset, 'o');
+    strokedata->dasharray.size = 0;
     const string_t* value = property_find(element, ID_STROKE_DASHARRAY);
     if(value == NULL)
         return;
@@ -2004,10 +2004,10 @@ static void resolve_stroke_data(otfsvg_document_t* document, render_state_t* sta
         length_t dash = {0, length_type_unknown};
         if(!parse_length_value(&it, end, &dash, false))
             break;
-        otfsvg_array_ensure(strokedata->dash, 1);
-        float* data = strokedata->dash.data;
-        data[strokedata->dash.size] = resolve_length(document, &dash, 'o');
-        strokedata->dash.size += 1;
+        otfsvg_array_ensure(strokedata->dasharray, 1);
+        float* data = strokedata->dasharray.data;
+        data[strokedata->dasharray.size] = resolve_length(document, &dash, 'o');
+        strokedata->dasharray.size += 1;
         skip_ws_comma(&it, end);
     }
 }
@@ -2022,12 +2022,12 @@ static void document_draw(otfsvg_document_t* document, render_state_t* state)
             return;
         resolve_stroke_data(document, state);
         otfsvg_stroke_data_t* strokedata = &document->strokedata;
-        float caplimit = strokedata->width / 2.f;
-        if(strokedata->cap == otfsvg_line_cap_square)
+        float caplimit = strokedata->linewidth / 2.f;
+        if(strokedata->linecap == otfsvg_line_cap_square)
             caplimit *= otfsvg_sqrt2;
 
-        float joinlimit = strokedata->width / 2.f;
-        if(strokedata->join == otfsvg_line_join_miter)
+        float joinlimit = strokedata->linewidth / 2.f;
+        if(strokedata->linejoin == otfsvg_line_join_miter)
             joinlimit *= strokedata->miterlimit;
 
         float delta = otfsvg_max(caplimit, joinlimit);
@@ -2212,7 +2212,7 @@ static void render_polyline(otfsvg_document_t* document, render_state_t* state, 
     otfsvg_path_t* path = &document->path;
     otfsvg_path_clear(path);
     parse_points(element, ID_POINTS, path);
-    if(path->elements.size == 0)
+    if(path->commands.size == 0)
         return;
 
     render_state_t newstate = {element, state->mode};
@@ -2233,7 +2233,7 @@ static void render_polygon(otfsvg_document_t* document, render_state_t* state, c
     otfsvg_path_clear(path);
     parse_points(element, ID_POINTS, path);
     otfsvg_path_close(path);
-    if(path->elements.size == 0)
+    if(path->commands.size == 0)
         return;
 
     render_state_t newstate = {element, state->mode};
@@ -2253,7 +2253,7 @@ static void render_path(otfsvg_document_t* document, render_state_t* state, cons
     otfsvg_path_t* path = &document->path;
     otfsvg_path_clear(path);
     parse_path(element, ID_D, path);
-    if(path->elements.size == 0)
+    if(path->commands.size == 0)
         return;
 
     render_state_t newstate = {element, state->mode};
@@ -2440,10 +2440,10 @@ static void render_children(otfsvg_document_t* document, render_state_t* state, 
 otfsvg_document_t* otfsvg_document_create(void)
 {
     otfsvg_document_t* document = malloc(sizeof(otfsvg_document_t));
-    otfsvg_array_init(document->path.elements);
+    otfsvg_array_init(document->path.commands);
     otfsvg_array_init(document->path.points);
     otfsvg_array_init(document->paint.gradient.stops);
-    otfsvg_array_init(document->strokedata.dash);
+    otfsvg_array_init(document->strokedata.dasharray);
     document->idcache = hashmap_create();
     document->heap = heap_create();
     document->root = NULL;
@@ -2456,10 +2456,10 @@ otfsvg_document_t* otfsvg_document_create(void)
 
 void otfsvg_document_destory(otfsvg_document_t* document)
 {
-    otfsvg_array_destroy(document->path.elements);
+    otfsvg_array_destroy(document->path.commands);
     otfsvg_array_destroy(document->path.points);
     otfsvg_array_destroy(document->paint.gradient.stops);
-    otfsvg_array_destroy(document->strokedata.dash);
+    otfsvg_array_destroy(document->strokedata.dasharray);
     hashmap_destroy(document->idcache);
     heap_destroy(document->heap);
     free(document);

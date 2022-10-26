@@ -177,22 +177,22 @@ void otfsvg_matrix_map_rect(const otfsvg_matrix_t* matrix, const otfsvg_rect_t* 
 }
 
 void otfsvg_path_init(otfsvg_path_t* path) {
-    otfsvg_array_init(path->elements);
+    otfsvg_array_init(path->commands);
     otfsvg_array_init(path->points);
 }
 
 void otfsvg_path_destroy(otfsvg_path_t* path) {
-    otfsvg_array_destroy(path->elements);
+    otfsvg_array_destroy(path->commands);
     otfsvg_array_destroy(path->points);
 }
 
 void otfsvg_path_move_to(otfsvg_path_t* path, float x, float y)
 {
-    otfsvg_array_ensure(path->elements, 1);
+    otfsvg_array_ensure(path->commands, 1);
     otfsvg_array_ensure(path->points, 1);
 
-    path->elements.data[path->elements.size] = otfsvg_path_element_move_to;
-    path->elements.size += 1;
+    path->commands.data[path->commands.size] = otfsvg_path_command_move_to;
+    path->commands.size += 1;
 
     path->points.data[path->points.size].x = x;
     path->points.data[path->points.size].y = y;
@@ -201,11 +201,11 @@ void otfsvg_path_move_to(otfsvg_path_t* path, float x, float y)
 
 void otfsvg_path_line_to(otfsvg_path_t* path, float x, float y)
 {
-    otfsvg_array_ensure(path->elements, 1);
+    otfsvg_array_ensure(path->commands, 1);
     otfsvg_array_ensure(path->points, 1);
 
-    path->elements.data[path->elements.size] = otfsvg_path_element_line_to;
-    path->elements.size += 1;
+    path->commands.data[path->commands.size] = otfsvg_path_command_line_to;
+    path->commands.size += 1;
 
     path->points.data[path->points.size].x = x;
     path->points.data[path->points.size].y = y;
@@ -223,11 +223,11 @@ void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, floa
 
 void otfsvg_path_cubic_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)
 {
-    otfsvg_array_ensure(path->elements, 1);
+    otfsvg_array_ensure(path->commands, 1);
     otfsvg_array_ensure(path->points, 3);
 
-    path->elements.data[path->elements.size] = otfsvg_path_element_cubic_to;
-    path->elements.size += 1;
+    path->commands.data[path->commands.size] = otfsvg_path_command_cubic_to;
+    path->commands.size += 1;
 
     path->points.data[path->points.size].x = x1;
     path->points.data[path->points.size].y = y1;
@@ -244,20 +244,20 @@ void otfsvg_path_cubic_to(otfsvg_path_t* path, float x1, float y1, float x2, flo
 
 void otfsvg_path_close(otfsvg_path_t* path)
 {
-    if(path->elements.size == 0)
+    if(path->commands.size == 0)
         return;
 
-    if(path->elements.data[path->elements.size - 1] == otfsvg_path_element_close)
+    if(path->commands.data[path->commands.size - 1] == otfsvg_path_command_close)
         return;
 
-    otfsvg_array_ensure(path->elements, 1);
-    path->elements.data[path->elements.size] = otfsvg_path_element_close;
-    path->elements.size += 1;
+    otfsvg_array_ensure(path->commands, 1);
+    path->commands.data[path->commands.size] = otfsvg_path_command_close;
+    path->commands.size += 1;
 }
 
 void otfsvg_path_clear(otfsvg_path_t* path)
 {
-    otfsvg_array_clear(path->elements);
+    otfsvg_array_clear(path->commands);
     otfsvg_array_clear(path->points);
 }
 

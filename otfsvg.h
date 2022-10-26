@@ -31,17 +31,38 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
+/**
+ * otfsvg_matrix_t defines an affine transformation
+ * @m00 - horizontal scaling
+ * @m10 - vertical skewing
+ * @m01 - horizontal skewing
+ * @m11 - vertical scaling
+ * @m02 - horizontal translation
+ * @m12 - vertical translation
+ **/
 typedef struct {
     float m00; float m10;
     float m01; float m11;
     float m02; float m12;
 } otfsvg_matrix_t;
 
+/**
+ * otfsvg_point_t defines a point in a plane
+ * @x - x coordinate of the point
+ * @y - y coordinate of the point
+ **/
 typedef struct {
     float x;
     float y;
 } otfsvg_point_t;
 
+/**
+ * otfsvg_rect_t defines a rectangle in a plane
+ * @x - x coordinate of the rectangle
+ * @x - y coordinate of the rectangle
+ * @w - width of the rectangle
+ * @h - height of the rectangle
+ **/
 typedef struct {
     float x;
     float y;
@@ -50,18 +71,44 @@ typedef struct {
 } otfsvg_rect_t;
 
 typedef enum {
-    otfsvg_path_element_move_to,
-    otfsvg_path_element_line_to,
-    otfsvg_path_element_cubic_to,
-    otfsvg_path_element_close
-} otfsvg_path_element_t;
+    otfsvg_path_command_move_to,
+    otfsvg_path_command_line_to,
+    otfsvg_path_command_cubic_to,
+    otfsvg_path_command_close
+} otfsvg_path_command_t;
 
+/**
+ * Path iteration example
+ *
+ * const otfsvg_path_command_t* commands = path->commands.data;
+ * const otfsvg_point_t* points = path->points.data;
+ * for(int i = 0; i < path->commands.size; ++i) {
+ *     switch(commands[i]) {
+ *     case otfsvg_path_command_move_to:
+ *         printf("M%f %f", points[0].x, points[0].y);
+ *         points += 1;
+ *         break;
+ *     case otfsvg_path_command_line_to:
+ *         printf("L%f %f", points[0].x, points[0].y);
+ *         points += 1;
+ *         break;
+ *     case otfsvg_path_command_cubic_to:
+ *         printf("C%f %f %f %f %f %f", points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
+ *         points += 3;
+ *         break;
+ *     case otfsvg_path_command_close:
+ *         putchar('Z');
+ *         break;
+ *     }
+ * }
+ *
+ **/
 typedef struct {
     struct {
-        otfsvg_path_element_t* data;
+        otfsvg_path_command_t* data;
         int size;
         int capacity;
-    } elements;
+    } commands;
     struct {
         otfsvg_point_t* data;
         int size;
@@ -69,6 +116,9 @@ typedef struct {
     } points;
 } otfsvg_path_t;
 
+/**
+ * otfsvg_color_t defines a 32-bit RGBA color (8-bit per component) stored as 0xAARRGGBB
+ **/
 typedef unsigned int otfsvg_color_t;
 
 #define otfsvg_blue_channel(c) (((c) >> 0) & 0xFF)
@@ -81,24 +131,24 @@ typedef unsigned int otfsvg_color_t;
 #define otfsvg_transparent_color 0x00000000
 
 typedef enum {
-    otfsvg_spread_method_pad,
-    otfsvg_spread_method_reflect,
-    otfsvg_spread_method_repeat
-} otfsvg_spread_method_t;
+    otfsvg_gradient_type_linear,
+    otfsvg_gradient_type_radial
+} otfsvg_gradient_type_t;
+
+typedef enum {
+    otfsvg_gradient_spread_pad,
+    otfsvg_gradient_spread_reflect,
+    otfsvg_gradient_spread_repeat
+} otfsvg_gradient_spread_t;
 
 typedef struct {
     float offset;
     otfsvg_color_t color;
 } otfsvg_gradient_stop_t;
 
-typedef enum {
-    otfsvg_gradient_type_linear,
-    otfsvg_gradient_type_radial
-} otfsvg_gradient_type_t;
-
 typedef struct {
     otfsvg_gradient_type_t type;
-    otfsvg_spread_method_t spread;
+    otfsvg_gradient_spread_t spread;
     otfsvg_matrix_t matrix;
     float x1, y1, x2, y2;
     float cx, cy, r, fx, fy;
@@ -143,16 +193,16 @@ typedef enum {
 } otfsvg_fill_rule_t;
 
 typedef struct {
-    otfsvg_line_cap_t cap;
-    otfsvg_line_join_t join;
+    otfsvg_line_cap_t linecap;
+    otfsvg_line_join_t linejoin;
+    float linewidth;
     float miterlimit;
-    float width;
+    float dashoffset;
     struct {
-        float offset;
         float* data;
         int size;
         int capacity;
-    } dash;
+    } dasharray;
 } otfsvg_stroke_data_t;
 
 typedef struct {
