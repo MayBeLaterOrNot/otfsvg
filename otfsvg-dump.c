@@ -259,7 +259,7 @@ static bool pushGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
     writeF(context, "opacity : %f", opacity);
     newLine(context);
     writeIndent(context);
-    writeString(context, "mode : ");
+    writeString(context, "blend-mode : ");
     if(mode == otfsvg_blend_mode_dst_in)
         writeString(context, "dst-in");
     else
@@ -279,7 +279,7 @@ static bool popGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
 int main(int argc, char* argv[])
 {
     if(argc != 3 && argc != 4) {
-        printf("usage : otfsvg-dump input output [id]\n");
+        printf("Usage : otfsvg-dump input output [id]\n");
         return -1;
     }
 
@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
 
     otfsvg_rect_t rect = {0, 0, 0, 0};
     if(!otfsvg_document_rect(document, &rect, id)) {
-        printf("Unable to render (%s)\n", id);
+        printf("Unable to locate (%s)\n", id);
         goto cleanup;
     }
 

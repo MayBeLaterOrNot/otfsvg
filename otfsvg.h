@@ -31,38 +31,11 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-/**
- * otfsvg_matrix_t defines an affine transformation
- * @m00 - horizontal scaling
- * @m10 - vertical skewing
- * @m01 - horizontal skewing
- * @m11 - vertical scaling
- * @m02 - horizontal translation
- * @m12 - vertical translation
- **/
-typedef struct {
-    float m00; float m10;
-    float m01; float m11;
-    float m02; float m12;
-} otfsvg_matrix_t;
-
-/**
- * otfsvg_point_t defines a point in a plane
- * @x - x coordinate of the point
- * @y - y coordinate of the point
- **/
 typedef struct {
     float x;
     float y;
 } otfsvg_point_t;
 
-/**
- * otfsvg_rect_t defines a rectangle in a plane
- * @x - x coordinate of the rectangle
- * @x - y coordinate of the rectangle
- * @w - width of the rectangle
- * @h - height of the rectangle
- **/
 typedef struct {
     float x;
     float y;
@@ -115,6 +88,21 @@ typedef struct {
         int capacity;
     } points;
 } otfsvg_path_t;
+
+/**
+ * otfsvg_matrix_t defines an affine transformation
+ * @m00 - horizontal scaling
+ * @m10 - vertical skewing
+ * @m01 - horizontal skewing
+ * @m11 - vertical scaling
+ * @m02 - horizontal translation
+ * @m12 - vertical translation
+ **/
+typedef struct {
+    float m00; float m10;
+    float m01; float m11;
+    float m02; float m12;
+} otfsvg_matrix_t;
 
 /**
  * otfsvg_color_t defines a 32-bit RGBA color (8-bit per component) stored as 0xAARRGGBB
@@ -217,7 +205,7 @@ typedef bool(*otfsvg_stroke_path_func_t)(void* userdata, const otfsvg_path_t* pa
 typedef bool(*otfsvg_push_group_func_t)(void* userdata, float opacity, otfsvg_blend_mode_t mode);
 typedef bool(*otfsvg_pop_group_func_t)(void* userdata, float opacity, otfsvg_blend_mode_t mode);
 typedef bool(*otfsvg_decode_image_func_t)(void* userdata, const char* data, size_t length, otfsvg_image_t* image);
-typedef bool(*otfsvg_draw_image_func_t)(void* userdata, const otfsvg_image_t* image, const otfsvg_matrix_t* matrix, const otfsvg_rect_t* rect, float opacity);
+typedef bool(*otfsvg_draw_image_func_t)(void* userdata, const otfsvg_image_t* image, const otfsvg_matrix_t* matrix, const otfsvg_rect_t* clip, float opacity);
 
 typedef struct {
     otfsvg_fill_path_func_t fill_path;

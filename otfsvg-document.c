@@ -144,7 +144,7 @@ enum {
     ID_RY,
     ID_SOLID_COLOR,
     ID_SOLID_OPACITY,
-    ID_gradient_spread,
+    ID_SPREAD_METHOD,
     ID_STOP_COLOR,
     ID_STOP_OPACITY,
     ID_STROKE,
@@ -196,7 +196,7 @@ static const name_entry_t propertymap[] = {
     {"ry", ID_RY},
     {"solid-color", ID_SOLID_COLOR},
     {"solid-opacity", ID_SOLID_OPACITY},
-    {"spreadMethod", ID_gradient_spread},
+    {"spreadMethod", ID_SPREAD_METHOD},
     {"stop-color", ID_STOP_COLOR},
     {"stop-opacity", ID_STOP_OPACITY},
     {"stroke", ID_STROKE},
@@ -521,7 +521,7 @@ struct otfsvg_document {
     float dpi;
 };
 
-static inline const string_t* property_get(const element_t* element, int id)
+static inline const string_t* property_get(element_t* element, int id)
 {
     const property_t* property = element->property;
     while(property != NULL) {
@@ -533,7 +533,7 @@ static inline const string_t* property_get(const element_t* element, int id)
     return NULL;
 }
 
-static inline const string_t* property_find(const element_t* element, int id)
+static inline const string_t* property_find(element_t* element, int id)
 {
     while(element != NULL) {
         const string_t* value = property_get(element, id);
@@ -545,7 +545,7 @@ static inline const string_t* property_find(const element_t* element, int id)
     return NULL;
 }
 
-static inline bool property_has(const element_t* element, int id)
+static inline bool property_has(element_t* element, int id)
 {
     const property_t* property = element->property;
     while(property != NULL) {
@@ -557,7 +557,7 @@ static inline bool property_has(const element_t* element, int id)
     return false;
 }
 
-static inline const string_t* property_search(const element_t* element, int id, bool inherit)
+static inline const string_t* property_search(element_t* element, int id, bool inherit)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL && inherit)
@@ -625,7 +625,7 @@ static inline bool parse_float(const char** begin, const char* end, float* numbe
     return *number >= -FLT_MAX && *number <= FLT_MAX;
 }
 
-static bool parse_number(const element_t* element, int id, float* number, bool percent, bool inherit)
+static bool parse_number(element_t* element, int id, float* number, bool percent, bool inherit)
 {
     const string_t* value = property_search(element, id, inherit);
     if(value == NULL)
@@ -694,7 +694,7 @@ static bool parse_length_value(const char** begin, const char* end, length_t* le
     return true;
 }
 
-static bool parse_length(const element_t* element, int id, length_t* length, bool negative, bool inherit)
+static bool parse_length(element_t* element, int id, length_t* length, bool negative, bool inherit)
 {
     const string_t* value = property_search(element, id, inherit);
     if(value == NULL)
@@ -1000,7 +1000,7 @@ static bool parse_color_value(const char** begin, const char* end, color_t* colo
     return true;
 }
 
-static bool parse_color(const element_t* element, int id, color_t* color)
+static bool parse_color(element_t* element, int id, color_t* color)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1012,7 +1012,7 @@ static bool parse_color(const element_t* element, int id, color_t* color)
     return false;
 }
 
-static bool parse_paint(const element_t* element, int id, paint_t* paint)
+static bool parse_paint(element_t* element, int id, paint_t* paint)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1064,7 +1064,7 @@ static bool parse_paint(const element_t* element, int id, paint_t* paint)
     return false;
 }
 
-static int parse_view_box(const element_t* element, int id, otfsvg_rect_t* viewbox)
+static bool parse_view_box(element_t* element, int id, otfsvg_rect_t* viewbox)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL)
@@ -1161,7 +1161,7 @@ static bool parse_transform_value(const char** begin, const char* end, transform
     return true;
 }
 
-static bool parse_transform(const element_t* element, int id, otfsvg_matrix_t* matrix)
+static bool parse_transform(element_t* element, int id, otfsvg_matrix_t* matrix)
 {
     otfsvg_matrix_init_identity(matrix);
     const string_t* value = property_get(element, id);
@@ -1238,7 +1238,7 @@ static bool parse_arc_flag(const char** begin, const char* end, bool* flag)
     return true;
 }
 
-static bool parse_path(const element_t* element, int id, otfsvg_path_t* path)
+static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
 {
     otfsvg_path_clear(path);
     const string_t* value = property_get(element, id);
@@ -1400,7 +1400,7 @@ static bool parse_path(const element_t* element, int id, otfsvg_path_t* path)
     return true;
 }
 
-static bool parse_points(const element_t* element, int id, otfsvg_path_t* path)
+static bool parse_points(element_t* element, int id, otfsvg_path_t* path)
 {
     otfsvg_path_clear(path);
     const string_t* value = property_get(element, id);
@@ -1426,7 +1426,177 @@ static bool parse_points(const element_t* element, int id, otfsvg_path_t* path)
     return true;
 }
 
-static bool parse_line_cap(const element_t* element, int id, otfsvg_line_cap_t* linecap)
+typedef enum {
+    position_align_none,
+    position_align_x_min_y_min,
+    position_align_x_mid_y_min,
+    position_align_x_max_y_min,
+    position_align_x_min_y_mid,
+    position_align_x_mid_y_mid,
+    position_align_x_max_y_mid,
+    position_align_x_min_y_max,
+    position_align_x_mid_y_max,
+    position_align_x_max_y_max
+} position_align_t;
+
+typedef enum {
+    position_scale_meet,
+    position_scale_slice
+} position_scale_t;
+
+typedef struct {
+    position_align_t align;
+    position_scale_t scale;
+} position_t;
+
+static bool parse_position(element_t* element, int id, position_t* position)
+{
+    const string_t* value = property_get(element, id);
+    if(value == NULL)
+        return false;
+
+    const char* it = value->data;
+    const char* end = it + value->length;
+    if(skip_string(&it, end, "none"))
+        position->align = position_align_none;
+    else if(skip_string(&it, end, "xMinYMin"))
+        position->align = position_align_x_min_y_min;
+    else if(skip_string(&it, end, "xMidYMin"))
+        position->align = position_align_x_mid_y_min;
+    else if(skip_string(&it, end, "xMaxYMin"))
+        position->align = position_align_x_max_y_min;
+    else if(skip_string(&it, end, "xMinYMid"))
+        position->align = position_align_x_min_y_mid;
+    else if(skip_string(&it, end, "xMidYMid"))
+        position->align = position_align_x_mid_y_mid;
+    else if(skip_string(&it, end, "xMaxYMid"))
+        position->align = position_align_x_max_y_mid;
+    else if(skip_string(&it, end, "xMinYMax"))
+        position->align = position_align_x_min_y_max;
+    else if(skip_string(&it, end, "xMidYMax"))
+        position->align = position_align_x_mid_y_max;
+    else if(skip_string(&it, end, "xMaxYMax"))
+        position->align = position_align_x_max_y_max;
+    else
+        return false;
+
+    position->scale = position_scale_meet;
+    if(position->align != position_align_none) {
+        skip_ws(&it, end);
+        if(skip_string(&it, end, "meet"))
+            position->scale = position_scale_meet;
+        else if(skip_string(&it, end, "slice"))
+            position->scale = position_scale_slice;
+    }
+
+    return !skip_ws(&it, end);
+}
+
+static void position_get_rect(const position_t* position, otfsvg_rect_t* rect, const otfsvg_rect_t* clip, float width, float height)
+{
+    rect->x = clip->x;
+    rect->y = clip->y;
+    if(position->align == position_align_none) {
+        rect->w = clip->w;
+        rect->h = clip->h;
+        return;
+    }
+
+    float sx = clip->w / width;
+    float sy = clip->h / height;
+    float scale = (position->scale == position_scale_meet) ? otfsvg_min(sx, sy) : otfsvg_max(sx, sy);
+    rect->w = width * scale;
+    rect->h = height * scale;
+
+    switch(position->align) {
+    case position_align_x_mid_y_min:
+    case position_align_x_mid_y_mid:
+    case position_align_x_mid_y_max:
+        rect->x += (clip->w - rect->w) * 0.5f;
+        break;
+    case position_align_x_max_y_min:
+    case position_align_x_max_y_mid:
+    case position_align_x_max_y_max:
+        rect->x += (clip->w - rect->w);
+        break;
+    default:
+        break;
+    }
+
+    switch(position->align) {
+    case position_align_x_min_y_mid:
+    case position_align_x_mid_y_mid:
+    case position_align_x_max_y_mid:
+        rect->y += (clip->h - rect->h) * 0.5f;
+        break;
+    case position_align_x_min_y_max:
+    case position_align_x_mid_y_max:
+    case position_align_x_max_y_max:
+        rect->y += (clip->h - rect->h);
+        break;
+    default:
+        break;
+    }
+}
+
+static void position_get_matrix(const position_t* position, otfsvg_matrix_t* matrix, const otfsvg_rect_t* viewbox, float width, float height)
+{
+    otfsvg_matrix_init_identity(matrix);
+    if(viewbox->w == 0.0 || viewbox->h == 0.0)
+        return;
+
+    float sx = width / viewbox->w;
+    float sy = height / viewbox->h;
+    if(sx == 0.0 || sy == 0.0)
+        return;
+
+    float tx = -viewbox->x;
+    float ty = -viewbox->y;
+    if(position->align == position_align_none) {
+        otfsvg_matrix_scale(matrix, sx, sy);
+        otfsvg_matrix_translate(matrix, tx, ty);
+        return;
+    }
+
+    float scale = (position->scale == position_scale_meet) ? otfsvg_min(sx, sy) : otfsvg_max(sx, sy);
+    float vw = width / scale;
+    float vh = height / scale;
+
+    switch(position->align) {
+    case position_align_x_mid_y_min:
+    case position_align_x_mid_y_mid:
+    case position_align_x_mid_y_max:
+        tx -= (viewbox->w - vw) * 0.5f;
+        break;
+    case position_align_x_max_y_min:
+    case position_align_x_max_y_mid:
+    case position_align_x_max_y_max:
+        tx -= (viewbox->w - vw);
+        break;
+    default:
+        break;
+    }
+
+    switch(position->align) {
+    case position_align_x_min_y_mid:
+    case position_align_x_mid_y_mid:
+    case position_align_x_max_y_mid:
+        ty -= (viewbox->h - vh) * 0.5f;
+        break;
+    case position_align_x_min_y_max:
+    case position_align_x_mid_y_max:
+    case position_align_x_max_y_max:
+        ty -= (viewbox->h - vh);
+        break;
+    default:
+        break;
+    }
+
+    otfsvg_matrix_scale(matrix, scale, scale);
+    otfsvg_matrix_translate(matrix, tx, ty);
+}
+
+static bool parse_line_cap(element_t* element, int id, otfsvg_line_cap_t* linecap)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1443,7 +1613,7 @@ static bool parse_line_cap(const element_t* element, int id, otfsvg_line_cap_t* 
     return !skip_ws(&it, end);
 }
 
-static bool parse_line_join(const element_t* element, int id, otfsvg_line_join_t* linejoin)
+static bool parse_line_join(element_t* element, int id, otfsvg_line_join_t* linejoin)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1460,7 +1630,7 @@ static bool parse_line_join(const element_t* element, int id, otfsvg_line_join_t
     return !skip_ws(&it, end);
 }
 
-static bool parse_winding(const element_t* element, int id, otfsvg_fill_rule_t* winding)
+static bool parse_winding(element_t* element, int id, otfsvg_fill_rule_t* winding)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1475,7 +1645,7 @@ static bool parse_winding(const element_t* element, int id, otfsvg_fill_rule_t* 
     return !skip_ws(&it, end);
 }
 
-static bool parse_gradient_spread(const element_t* element, int id, otfsvg_gradient_spread_t* spread)
+static bool parse_gradient_spread(element_t* element, int id, otfsvg_gradient_spread_t* spread)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL)
@@ -1497,7 +1667,7 @@ typedef enum {
     display_none
 } display_t;
 
-static bool parse_display(const element_t* element, int id, display_t* display)
+static bool parse_display(element_t* element, int id, display_t* display)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL)
@@ -1517,7 +1687,7 @@ typedef enum {
     visibility_hidden
 } visibility_t;
 
-static bool parse_visibility(const element_t* element, int id, visibility_t* visibility)
+static bool parse_visibility(element_t* element, int id, visibility_t* visibility)
 {
     const string_t* value = property_find(element, id);
     if(value == NULL)
@@ -1537,7 +1707,7 @@ typedef enum {
     units_type_user_space_on_use
 } units_type_t;
 
-static bool parse_units(const element_t* element, int id, units_type_t* units)
+static bool parse_units(element_t* element, int id, units_type_t* units)
 {
     const string_t* value = property_get(element, id);
     if(value == NULL)
@@ -1559,12 +1729,12 @@ typedef enum {
 } render_mode_t;
 
 typedef struct {
-    const element_t* element;
+    element_t* element;
     render_mode_t mode;
     float opacity;
     otfsvg_matrix_t matrix;
     otfsvg_rect_t bbox;
-    const element_t* clippath;
+    element_t* clippath;
     bool compositing;
 } render_state_t;
 
@@ -1600,6 +1770,22 @@ static bool document_pop_group(otfsvg_document_t* document, float opacity, otfsv
     return false;
 }
 
+static bool document_decode_image(otfsvg_document_t* document, const string_t* href, otfsvg_image_t* image)
+{
+    otfsvg_canvas_t* canvas = document->canvas;
+    if(canvas && canvas->decode_image)
+        return canvas->decode_image(document->canvas_data, href->data, href->length, image);
+    return false;
+}
+
+static bool document_draw_image(otfsvg_document_t* document, const render_state_t* state, const otfsvg_image_t* image, const otfsvg_rect_t* clip)
+{
+    otfsvg_canvas_t* canvas = document->canvas;
+    if(canvas && canvas->draw_image)
+        return canvas->draw_image(document->canvas_data, image, &state->matrix, clip, state->opacity);
+    return false;
+}
+
 static bool document_get_palette(otfsvg_document_t* document, const string_t* id, otfsvg_color_t* color)
 {
     if(document->palette_func == NULL)
@@ -1607,11 +1793,11 @@ static bool document_get_palette(otfsvg_document_t* document, const string_t* id
     return document->palette_func(document->palette_data, id->data, id->length, color);
 }
 
-static const element_t* resolve_iri(const otfsvg_document_t* document, const element_t* element, int id);
+static element_t* resolve_iri(const otfsvg_document_t* document, element_t* element, int id);
 
 static void render_state_begin(otfsvg_document_t* document, render_state_t* state, render_state_t* newstate, otfsvg_blend_mode_t mode)
 {
-    const element_t* element = newstate->element;
+    element_t* element = newstate->element;
     float opacity = 1.f;
 
     if(newstate->mode == render_mode_display)
@@ -1634,7 +1820,7 @@ static void render_state_begin(otfsvg_document_t* document, render_state_t* stat
     }
 }
 
-static void render_clip_path(otfsvg_document_t* document, render_state_t* state, const element_t* element);
+static void render_clip_path(otfsvg_document_t* document, render_state_t* state, element_t* element);
 
 static void render_state_end(otfsvg_document_t* document, render_state_t* state, render_state_t* newstate, otfsvg_blend_mode_t mode)
 {
@@ -1666,12 +1852,12 @@ static float resolve_length(const otfsvg_document_t* document, const length_t* l
     return convert_length(length, 1.0f, document->dpi);
 }
 
-static const element_t* element_find(const otfsvg_document_t* document, const string_t* id)
+static element_t* element_find(const otfsvg_document_t* document, const string_t* id)
 {
     return hashmap_get(document->idcache, id->data, id->length);
 }
 
-static const element_t* resolve_iri(const otfsvg_document_t* document, const element_t* element, int id)
+static element_t* resolve_iri(const otfsvg_document_t* document, element_t* element, int id)
 {
     const string_t* value = property_get(element, id);
     if(value && value->length > 1 && value->data[0] == '#') {
@@ -1699,7 +1885,7 @@ static float resolve_gradient_length(const otfsvg_document_t* document, const le
     return resolve_length(document, length, mode);
 }
 
-static void resolve_gradient_stop(const otfsvg_document_t* document, otfsvg_gradient_t* gradient, float opacity, const element_t* element)
+static void resolve_gradient_stop(const otfsvg_document_t* document, otfsvg_gradient_t* gradient, float opacity, element_t* element)
 {
     float offset = 0;
     float stop_opacity = 1.f;
@@ -1716,10 +1902,10 @@ static void resolve_gradient_stop(const otfsvg_document_t* document, otfsvg_grad
     gradient->stops.size += 1;
 }
 
-static void resolve_gradient_stops(const otfsvg_document_t* document, otfsvg_gradient_t* gradient, float opacity, const element_t* element)
+static void resolve_gradient_stops(const otfsvg_document_t* document, otfsvg_gradient_t* gradient, float opacity, element_t* element)
 {
     otfsvg_array_clear(gradient->stops);
-    const element_t* child = element->firstchild;
+    element_t* child = element->firstchild;
     while(child) {
         if(child->id == TAG_STOP)
             resolve_gradient_stop(document, gradient, opacity, child);
@@ -1727,10 +1913,10 @@ static void resolve_gradient_stops(const otfsvg_document_t* document, otfsvg_gra
     }
 }
 
-static void fill_gradient_elements(const element_t* current, const element_t** elements)
+static void fill_gradient_elements(element_t* current, element_t** elements)
 {
     if(elements[0] == NULL) {
-        const element_t* child = current->firstchild;
+        element_t* child = current->firstchild;
         while(child) {
             if(child->id == TAG_STOP) {
                 elements[0] = current;
@@ -1745,15 +1931,15 @@ static void fill_gradient_elements(const element_t* current, const element_t** e
         elements[1] = current;
     if(elements[2] == NULL && property_has(current, ID_GRADIENT_UNITS))
         elements[2] = current;
-    if(elements[3] == NULL && property_has(current, ID_gradient_spread))
+    if(elements[3] == NULL && property_has(current, ID_SPREAD_METHOD))
         elements[3] = current;
 }
 
-static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t* state, const element_t* element, float opacity)
+static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t* state, element_t* element, float opacity)
 {
-    const element_t* elements[8];
+    element_t* elements[8];
     memset(elements, 0, sizeof(elements));
-    const element_t* current = element;
+    element_t* current = element;
     while(true) {
         fill_gradient_elements(current, elements);
         if(current->id == TAG_LINEAR_GRADIENT) {
@@ -1767,7 +1953,7 @@ static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t*
                 elements[7] = current;
         }
 
-        const element_t* ref = resolve_iri(document, current, ID_XLINK_HREF);
+        element_t* ref = resolve_iri(document, current, ID_XLINK_HREF);
         if(ref == NULL || !(ref->id == TAG_LINEAR_GRADIENT || ref->id == TAG_RADIAL_GRADIENT))
             break;
         current = ref;
@@ -1794,7 +1980,7 @@ static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t*
     resolve_gradient_stops(document, gradient, opacity, elements[0]);
     parse_transform(elements[1], ID_GRADIENT_TRANSFORM, &matrix);
     parse_units(elements[2], ID_GRADIENT_UNITS, &units);
-    parse_gradient_spread(elements[3], ID_gradient_spread, &spread);
+    parse_gradient_spread(elements[3], ID_SPREAD_METHOD, &spread);
     if(units == units_type_object_bounding_box) {
         otfsvg_matrix_t m;
         otfsvg_matrix_init_translate(&m, state->bbox.x, state->bbox.y);
@@ -1822,11 +2008,11 @@ static bool resolve_linear_gradient(otfsvg_document_t* document, render_state_t*
     return true;
 }
 
-static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t* state, const element_t* element, float opacity)
+static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t* state, element_t* element, float opacity)
 {
-    const element_t* elements[9];
+    element_t* elements[9];
     memset(elements, 0, sizeof(elements));
-    const element_t* current = element;
+    element_t* current = element;
     while(true) {
         fill_gradient_elements(current, elements);
         if(current->id == TAG_RADIAL_GRADIENT) {
@@ -1842,7 +2028,7 @@ static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t*
                 elements[8] = current;
         }
 
-        const element_t* ref = resolve_iri(document, current, ID_XLINK_HREF);
+        element_t* ref = resolve_iri(document, current, ID_XLINK_HREF);
         if(ref == NULL || !(ref->id == TAG_LINEAR_GRADIENT || ref->id == TAG_RADIAL_GRADIENT))
             break;
         current = ref;
@@ -1871,7 +2057,7 @@ static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t*
     resolve_gradient_stops(document, gradient, opacity, elements[0]);
     parse_transform(elements[1], ID_GRADIENT_TRANSFORM, &matrix);
     parse_units(elements[2], ID_GRADIENT_UNITS, &units);
-    parse_gradient_spread(elements[3], ID_gradient_spread, &spread);
+    parse_gradient_spread(elements[3], ID_SPREAD_METHOD, &spread);
     if(units == units_type_object_bounding_box) {
         otfsvg_matrix_t m;
         otfsvg_matrix_init_translate(&m, state->bbox.x, state->bbox.y);
@@ -1902,7 +2088,7 @@ static bool resolve_radial_gradient(otfsvg_document_t* document, render_state_t*
     return true;
 }
 
-static bool resolve_solid_color(otfsvg_document_t* document, const element_t* element, float opacity)
+static bool resolve_solid_color(otfsvg_document_t* document, element_t* element, float opacity)
 {
     float solid_opacity = 1.f;
     color_t solid_color = {color_type_fixed, otfsvg_black_color};
@@ -1933,7 +2119,7 @@ static bool resolve_paint(otfsvg_document_t* document, render_state_t* state, co
         document->paint.color = resolve_color(document, &color, opacity);;
     }
 
-    const element_t* ref = element_find(document, &paint->id);
+    element_t* ref = element_find(document, &paint->id);
     if(ref == NULL) {
         document->paint.type = otfsvg_paint_type_color;
         document->paint.color = resolve_color(document, &paint->color, opacity);
@@ -1951,7 +2137,7 @@ static bool resolve_paint(otfsvg_document_t* document, render_state_t* state, co
 
 static bool resolve_fill(otfsvg_document_t* document, render_state_t* state)
 {
-    const element_t* element = state->element;
+    element_t* element = state->element;
     paint_t fill = {paint_type_color, {color_type_fixed, otfsvg_black_color}};
     float opacity = 1.f;
 
@@ -1962,7 +2148,7 @@ static bool resolve_fill(otfsvg_document_t* document, render_state_t* state)
 
 static bool resolve_stroke(otfsvg_document_t* document, render_state_t* state)
 {
-    const element_t* element = state->element;
+    element_t* element = state->element;
     paint_t stroke = {paint_type_none, {color_type_fixed, otfsvg_transparent_color}};
     float opacity = 1.f;
 
@@ -1973,7 +2159,7 @@ static bool resolve_stroke(otfsvg_document_t* document, render_state_t* state)
 
 static void resolve_stroke_data(otfsvg_document_t* document, render_state_t* state)
 {
-    const element_t* element = state->element;
+    element_t* element = state->element;
     otfsvg_line_cap_t linecap = otfsvg_line_cap_butt;
     otfsvg_line_join_t linejoin = otfsvg_line_join_miter;
 
@@ -2014,7 +2200,7 @@ static void resolve_stroke_data(otfsvg_document_t* document, render_state_t* sta
 
 static void document_draw(otfsvg_document_t* document, render_state_t* state)
 {
-    const element_t* element = state->element;
+    element_t* element = state->element;
     if(state->mode == render_mode_bounding) {
         paint_t paint = {paint_type_none};
         parse_paint(element, ID_STROKE, &paint);
@@ -2064,17 +2250,17 @@ static void document_draw(otfsvg_document_t* document, render_state_t* state)
     }
 }
 
-static bool is_display_none(const element_t* element)
+static bool is_display_none(element_t* element)
 {
     display_t display = display_inline;
     parse_display(element, ID_DISPLAY, &display);
     return display == display_none;
 }
 
-static void render_element(otfsvg_document_t* document, render_state_t* state, const element_t* element);
-static void render_children(otfsvg_document_t* document, render_state_t* state, const element_t* element);
+static void render_element(otfsvg_document_t* document, render_state_t* state, element_t* element);
+static void render_children(otfsvg_document_t* document, render_state_t* state, element_t* element);
 
-static void render_clip_path(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_clip_path(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     units_type_t units = units_type_user_space_on_use;
     parse_units(element, ID_CLIP_PATH_UNITS, &units);
@@ -2091,17 +2277,16 @@ static void render_clip_path(otfsvg_document_t* document, render_state_t* state,
     render_state_end(document, state, &newstate, otfsvg_blend_mode_dst_in);
 }
 
-static void render_svg(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_image(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
 
-    length_t w = {100, length_type_percent};
-    length_t h = {100, length_type_percent};
+    length_t w = {0, length_type_px};
+    length_t h = {0, length_type_px};
 
     parse_length(element, ID_WIDTH, &w, false, false);
     parse_length(element, ID_HEIGHT, &h, false, false);
-
     if(is_length_zero(w) || is_length_zero(h))
         return;
 
@@ -2116,25 +2301,77 @@ static void render_svg(otfsvg_document_t* document, render_state_t* state, const
     float _w = resolve_length(document, &w, 'x');
     float _h = resolve_length(document, &h, 'y');
 
+    const string_t* href = property_get(element, ID_XLINK_HREF);
+    if(href == NULL)
+        return;
+
+    otfsvg_image_t image;
+    if(!document_decode_image(document, href, &image))
+        return;
+
     render_state_t newstate = {element, state->mode};
     render_state_begin(document, state, &newstate, otfsvg_blend_mode_src_over);
 
+    newstate.bbox.x = _x;
+    newstate.bbox.y = _y;
+    newstate.bbox.w = _w;
+    newstate.bbox.h = _h;
+
+    position_t position = {position_align_x_mid_y_mid, position_scale_meet};
+    parse_position(element, ID_PRESERVE_ASPECT_RATIO, &position);
+
+    otfsvg_rect_t rect;
+    otfsvg_rect_t clip = {_x, _y, _w, _h};
+    position_get_rect(&position, &rect, &clip, image.width, image.height);
+
+    otfsvg_matrix_translate(&newstate.matrix, rect.x, rect.y);
+    otfsvg_matrix_scale(&newstate.matrix, rect.w / image.width, rect.h / image.height);
+
+    document_draw_image(document, &newstate, &image, &clip);
+    render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
+}
+
+static void render_svg(otfsvg_document_t* document, render_state_t* state, element_t* element)
+{
+    if(document->width == 0.f || document->height == 0.f)
+        return;
+    if(is_display_none(element))
+        return;
+
+    length_t x = {0, length_type_px};
+    length_t y = {0, length_type_px};
+
+    parse_length(element, ID_X, &x, true, false);
+    parse_length(element, ID_Y, &y, true, false);
+
+    render_state_t newstate = {element, state->mode};
+    render_state_begin(document, state, &newstate, otfsvg_blend_mode_src_over);
+
+    float _x = resolve_length(document, &x, 'x');
+    float _y = resolve_length(document, &y, 'y');
+
+    otfsvg_matrix_translate(&newstate.matrix, _x, _y);
+
     otfsvg_rect_t viewbox;
     if(parse_view_box(element, ID_VIEWBOX, &viewbox)) {
-    } else {
-        otfsvg_matrix_translate(&newstate.matrix, _x, _y);
+        position_t position = {position_align_x_mid_y_mid, position_scale_meet};
+        parse_position(element, ID_PRESERVE_ASPECT_RATIO, &position);
+
+        otfsvg_matrix_t matrix;
+        position_get_matrix(&position, &matrix, &viewbox, document->width, document->height);
+        otfsvg_matrix_multiply(&newstate.matrix, &matrix, &newstate.matrix);
     }
 
     render_children(document, &newstate, element);
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_use(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_use(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
 
-    const element_t* ref = resolve_iri(document, element, ID_XLINK_HREF);
+    element_t* ref = resolve_iri(document, element, ID_XLINK_HREF);
     if(ref == NULL)
         return;
 
@@ -2151,12 +2388,16 @@ static void render_use(otfsvg_document_t* document, render_state_t* state, const
     float _y = resolve_length(document, &y, 'y');
 
     otfsvg_matrix_translate(&newstate.matrix, _x, _y);
+
+    element_t* parent = ref->parent;
+    ref->parent = element;
     render_element(document, &newstate, ref);
+    ref->parent = parent;
 
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_g(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_g(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2167,7 +2408,7 @@ static void render_g(otfsvg_document_t* document, render_state_t* state, const e
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_line(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_line(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2204,7 +2445,7 @@ static void render_line(otfsvg_document_t* document, render_state_t* state, cons
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_polyline(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_polyline(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2224,7 +2465,7 @@ static void render_polyline(otfsvg_document_t* document, render_state_t* state, 
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_polygon(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_polygon(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2245,7 +2486,7 @@ static void render_polygon(otfsvg_document_t* document, render_state_t* state, c
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_path(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_path(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2265,7 +2506,7 @@ static void render_path(otfsvg_document_t* document, render_state_t* state, cons
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_ellipse(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_ellipse(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2306,7 +2547,7 @@ static void render_ellipse(otfsvg_document_t* document, render_state_t* state, c
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_circle(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_circle(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2342,7 +2583,7 @@ static void render_circle(otfsvg_document_t* document, render_state_t* state, co
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_rect(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_rect(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     if(is_display_none(element))
         return;
@@ -2395,7 +2636,7 @@ static void render_rect(otfsvg_document_t* document, render_state_t* state, cons
     render_state_end(document, state, &newstate, otfsvg_blend_mode_src_over);
 }
 
-static void render_element(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_element(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
     switch(element->id) {
     case TAG_USE:
@@ -2428,9 +2669,9 @@ static void render_element(otfsvg_document_t* document, render_state_t* state, c
     }
 }
 
-static void render_children(otfsvg_document_t* document, render_state_t* state, const element_t* element)
+static void render_children(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
-    const element_t* child = element->firstchild;
+    element_t* child = element->firstchild;
     while(child) {
         render_element(document, state, child);
         child = child->nextchild;
@@ -2743,7 +2984,7 @@ bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas
         render_svg(document, &state, state.element);
     } else {
         string_t name = {id, strlen(id)};
-        const element_t* element = element_find(document, &name);
+        element_t* element = element_find(document, &name);
         if(element == NULL)
             return false;
         state.element = element;
@@ -2772,7 +3013,7 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
         render_svg(document, &state, state.element);
     } else {
         string_t name = {id, strlen(id)};
-        const element_t* element = element_find(document, &name);
+        element_t* element = element_find(document, &name);
         if(element == NULL)
             return false;
         state.element = element;

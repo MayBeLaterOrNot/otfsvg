@@ -176,12 +176,14 @@ void otfsvg_matrix_map_rect(const otfsvg_matrix_t* matrix, const otfsvg_rect_t* 
     dst->h = b - t;
 }
 
-void otfsvg_path_init(otfsvg_path_t* path) {
+void otfsvg_path_init(otfsvg_path_t* path)
+{
     otfsvg_array_init(path->commands);
     otfsvg_array_init(path->points);
 }
 
-void otfsvg_path_destroy(otfsvg_path_t* path) {
+void otfsvg_path_destroy(otfsvg_path_t* path)
+{
     otfsvg_array_destroy(path->commands);
     otfsvg_array_destroy(path->points);
 }
