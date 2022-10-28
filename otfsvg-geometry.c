@@ -220,7 +220,7 @@ void otfsvg_path_quad_to(otfsvg_path_t* path, float x1, float y1, float x2, floa
     float cy1 = 2.f / 3.f * y2 + 1.f / 3.f * y1;
     float cx2 = 2.f / 3.f * x2 + 1.f / 3.f * x3;
     float cy2 = 2.f / 3.f * y2 + 1.f / 3.f * y3;
-    otfsvg_path_cubic_to(path, cx1, cy1, cx2, cy2, x1, y1);
+    otfsvg_path_cubic_to(path, cx1, cy1, cx2, cy2, x3, y3);
 }
 
 void otfsvg_path_cubic_to(otfsvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)

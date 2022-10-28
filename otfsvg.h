@@ -90,7 +90,7 @@ typedef struct {
 } otfsvg_path_t;
 
 /**
- * otfsvg_matrix_t defines an affine transformation
+ * otfsvg_matrix_t defines an affine transformation matrix
  * @m00 - horizontal scaling
  * @m10 - vertical skewing
  * @m01 - horizontal skewing

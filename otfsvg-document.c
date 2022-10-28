@@ -1260,6 +1260,7 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
     float last_control_y = 0;
     float current_x = 0;
     float current_y = 0;
+    char last_command = command;
     while(true) {
         skip_ws(&it, end);
         if(command == 'M' || command == 'm') {
@@ -1318,8 +1319,14 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             current_x = c[4];
             current_y = c[5];
         } else if(command == 'T' || command == 't') {
-            c[0] = 2 * current_x - last_control_x;
-            c[1] = 2 * current_y - last_control_y;
+            if(last_command != 'Q' && last_command != 'q' && last_command != 'T' && last_command != 't') {
+                c[0] = current_x;
+                c[1] = current_y;
+            } else {
+                c[0] = 2 * current_x - last_control_x;
+                c[1] = 2 * current_y - last_control_y;
+            }
+
             if(!parse_coordinates(&it, end, c + 2, 2))
                 return false;
             if(command == 't') {
@@ -1333,8 +1340,14 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             current_x = c[2];
             current_y = c[3];
         } else if(command == 'S' || command == 's') {
-            c[0] = 2 * current_x - last_control_x;
-            c[1] = 2 * current_y - last_control_y;
+            if(last_command != 'C' && last_command != 'c' && last_command != 'S' && last_command != 's') {
+                c[0] = current_x;
+                c[1] = current_y;
+            } else {
+                c[0] = 2 * current_x - last_control_x;
+                c[1] = 2 * current_y - last_control_y;
+            }
+
             if(!parse_coordinates(&it, end, c + 2, 4))
                 return false;
             if(command == 's') {
@@ -1393,8 +1406,10 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
         if(it >= end)
             break;
 
-        if(IS_ALPHA(*it))
+        if(IS_ALPHA(*it)) {
+            last_command = command;
             command = *it++;
+        }
     }
 
     return true;
