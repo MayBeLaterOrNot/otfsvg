@@ -586,17 +586,17 @@ static inline bool parse_float(const char** begin, const char* end, float* numbe
 
     if(*it != '.') {
         while(*it && IS_NUM(*it))
-            integer = 10.0 * integer + (*it++ - '0');
+            integer = 10.f * integer + (*it++ - '0');
     }
 
     if(it < end && *it == '.') {
         ++it;
         if(it >= end || !IS_NUM(*it))
             return false;
-        float div = 1.0;
+        float div = 1.f;
         while(it < end && IS_NUM(*it)) {
-            fraction = 10.0 * fraction + (*it++ - '0');
-            div *= 10.0;
+            fraction = 10.f * fraction + (*it++ - '0');
+            div *= 10.f;
         }
 
         fraction /= div;
@@ -621,7 +621,7 @@ static inline bool parse_float(const char** begin, const char* end, float* numbe
     *begin = it;
     *number = sign * (integer + fraction);
     if(exponent)
-        *number *= powf(10.0, expsign * exponent);
+        *number *= powf(10.f, expsign * exponent);
     return *number >= -FLT_MAX && *number <= FLT_MAX;
 }
 
@@ -638,8 +638,8 @@ static bool parse_number(element_t* element, int id, float* number, bool percent
 
     if(percent) {
         if(skip_delim(&it, end, '%'))
-            *number /= 100.0;
-        *number = otfsvg_clamp(*number, 0.0, 1.0);
+            *number /= 100.f;
+        *number = otfsvg_clamp(*number, 0.f, 1.f);
     }
 
     return true;
@@ -671,7 +671,7 @@ static bool parse_length_value(const char** begin, const char* end, length_t* le
     if(!parse_float(&it, end, &length->value))
         return false;
 
-    if(!negative && length->value < 0.0)
+    if(!negative && length->value < 0)
         return false;
     length->type = length_type_number;
     if(skip_delim(&it, end, '%'))
@@ -716,17 +716,17 @@ static inline float convert_length(const length_t* length, float max, float dpi)
     case length_type_in:
         return length->value * dpi;
     case length_type_cm:
-        return length->value * dpi / 2.54;
+        return length->value * dpi / 2.54f;
     case length_type_mm:
-        return length->value * dpi / 25.4;
+        return length->value * dpi / 25.4f;
     case length_type_pt:
-        return length->value * dpi / 72.0;
+        return length->value * dpi / 72.f;
     case length_type_pc:
-        return length->value * dpi / 6.0;
+        return length->value * dpi / 6.f;
     case length_type_percent:
-        return length->value * max / 100.0;
+        return length->value * max / 100.f;
     default:
-        return 0.0;
+        return 0.f;
     }
 }
 
@@ -1557,12 +1557,12 @@ static void position_get_rect(const position_t* position, otfsvg_rect_t* rect, c
 static void position_get_matrix(const position_t* position, otfsvg_matrix_t* matrix, const otfsvg_rect_t* viewbox, float width, float height)
 {
     otfsvg_matrix_init_identity(matrix);
-    if(viewbox->w == 0.0 || viewbox->h == 0.0)
+    if(viewbox->w == 0.f || viewbox->h == 0.f)
         return;
 
     float sx = width / viewbox->w;
     float sy = height / viewbox->h;
-    if(sx == 0.0 || sy == 0.0)
+    if(sx == 0.f || sy == 0.f)
         return;
 
     float tx = -viewbox->x;
@@ -1864,7 +1864,7 @@ static float resolve_length(const otfsvg_document_t* document, const length_t* l
         return length->value * max / 100.f;
     }
 
-    return convert_length(length, 1.0f, document->dpi);
+    return convert_length(length, 1.f, document->dpi);
 }
 
 static element_t* element_find(const otfsvg_document_t* document, const string_t* id)
@@ -2181,7 +2181,7 @@ static void resolve_stroke_data(otfsvg_document_t* document, render_state_t* sta
     parse_line_cap(element, ID_STROKE_LINECAP, &linecap);
     parse_line_join(element, ID_STROKE_LINEJOIN, &linejoin);
 
-    float miterlimit = 4;
+    float miterlimit = 4.f;
     length_t linewidth = {1, length_type_number};
     length_t dashoffset = {0, length_type_number};
 

@@ -39,26 +39,26 @@ void otfsvg_matrix_init(otfsvg_matrix_t* matrix, float m00, float m10, float m01
 
 void otfsvg_matrix_init_identity(otfsvg_matrix_t* matrix)
 {
-    matrix->m00 = 1.0; matrix->m10 = 0.0;
-    matrix->m01 = 0.0; matrix->m11 = 1.0;
-    matrix->m02 = 0.0; matrix->m12 = 0.0;
+    matrix->m00 = 1.f; matrix->m10 = 0.f;
+    matrix->m01 = 0.f; matrix->m11 = 1.f;
+    matrix->m02 = 0.f; matrix->m12 = 0.f;
 }
 
 void otfsvg_matrix_init_translate(otfsvg_matrix_t* matrix, float x, float y)
 {
-    otfsvg_matrix_init(matrix, 1.0, 0.0, 0.0, 1.0, x, y);
+    otfsvg_matrix_init(matrix, 1.f, 0.f, 0.f, 1.f, x, y);
 }
 
 void otfsvg_matrix_init_scale(otfsvg_matrix_t* matrix, float x, float y)
 {
-    otfsvg_matrix_init(matrix, x, 0.0, 0.0, y, 0.0, 0.0);
+    otfsvg_matrix_init(matrix, x, 0.f, 0.f, y, 0.f, 0.f);
 }
 
 void otfsvg_matrix_init_shear(otfsvg_matrix_t* matrix, float x, float y)
 {
     float ytan = tanf(otfsvg_deg2rad(y));
     float xtan = tanf(otfsvg_deg2rad(x));
-    otfsvg_matrix_init(matrix, 1.0, ytan, xtan, 1.0, 0.0, 0.0);
+    otfsvg_matrix_init(matrix, 1.f, ytan, xtan, 1.f, 0.f, 0.f);
 }
 
 void otfsvg_matrix_init_rotate(otfsvg_matrix_t* matrix, float angle, float x, float y)
@@ -117,10 +117,10 @@ void otfsvg_matrix_multiply(otfsvg_matrix_t* matrix, const otfsvg_matrix_t* a, c
 bool otfsvg_matrix_invert(otfsvg_matrix_t* matrix)
 {
     float det = (matrix->m00 * matrix->m11 - matrix->m10 * matrix->m01);
-    if(det == 0.0)
+    if(det == 0.f)
         return false;
 
-    float inv_det = 1.0 / det;
+    float inv_det = 1.f / det;
     float m00 = matrix->m00 * inv_det;
     float m10 = matrix->m10 * inv_det;
     float m01 = matrix->m01 * inv_det;
@@ -267,11 +267,13 @@ void otfsvg_path_arc_to(otfsvg_path_t* path, float x1, float y1, float rx, float
 {
     if(rx < 0) rx = -rx;
     if(ry < 0) ry = -ry;
+    if(rx == 0.f || ry == 0.f)
+        return;
+    if(x1 == x2 && y1 == y2)
+        return;
 
     float dx = x1 - x2;
     float dy = y1 - y2;
-    if(!rx || !ry || !dx || !dy)
-        return;
 
     dx *= 0.5f;
     dy *= 0.5f;
@@ -290,7 +292,7 @@ void otfsvg_path_arc_to(otfsvg_path_t* path, float x1, float y1, float rx, float
         ry *= sqrtf(radius);
     }
 
-    otfsvg_matrix_init_scale(&matrix, 1 / rx, 1 / ry);
+    otfsvg_matrix_init_scale(&matrix, 1.f / rx, 1.f / ry);
     otfsvg_matrix_rotate(&matrix, -angle, 0, 0);
     otfsvg_matrix_map(&matrix, x1, y1, &x1, &y1);
     otfsvg_matrix_map(&matrix, x2, y2, &x2, &y2);
@@ -312,9 +314,9 @@ void otfsvg_path_arc_to(otfsvg_path_t* path, float x1, float y1, float rx, float
     float th2 = atan2f(y2 - cy1, x2 - cx1);
     float th_arc = th2 - th1;
     if(th_arc < 0 && sweep_flag)
-        th_arc += 2.0f * otfsvg_pi;
+        th_arc += 2.f * otfsvg_pi;
     else if(th_arc > 0 && !sweep_flag)
-        th_arc -= 2.0f * otfsvg_pi;
+        th_arc -= 2.f * otfsvg_pi;
     otfsvg_matrix_init_rotate(&matrix, angle, 0, 0);
     otfsvg_matrix_scale(&matrix, rx, ry);
     int segments = ceilf(fabsf(th_arc / (otfsvg_pi * 0.5f + 0.001f)));
@@ -354,8 +356,8 @@ void otfsvg_path_add_rect(otfsvg_path_t* path, float x, float y, float w, float 
 
 void otfsvg_path_add_round_rect(otfsvg_path_t* path, float x, float y, float w, float h, float rx, float ry)
 {
-    rx = otfsvg_min(rx, w * 0.5);
-    ry = otfsvg_min(ry, h * 0.5);
+    rx = otfsvg_min(rx, w * 0.5f);
+    ry = otfsvg_min(ry, h * 0.5f);
     if(rx == 0.f && ry == 0.f) {
         otfsvg_path_add_rect(path, x, y, w, h);
         return;
