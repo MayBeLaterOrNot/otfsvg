@@ -1272,8 +1272,8 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             }
 
             otfsvg_path_move_to(path, c[0], c[1]);
-            current_x = start_x = last_control_x = c[0];
-            current_y = start_y = last_control_y = c[1];
+            current_x = start_x = c[0];
+            current_y = start_y = c[1];
             command = command == 'm' ? 'l' : 'L';
         } else if(command == 'L' || command == 'l') {
             if(!parse_coordinates(&it, end, c, 2))
@@ -1284,8 +1284,24 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             }
 
             otfsvg_path_line_to(path, c[0], c[1]);
-            current_x = last_control_x = c[0];
-            current_y = last_control_y = c[1];
+            current_x = c[0];
+            current_y = c[1];
+        } else if(command == 'H' || command == 'h') {
+            if(!parse_coordinates(&it, end, c, 1))
+                return false;
+            if(command == 'h')
+                c[0] += current_x;
+
+            otfsvg_path_line_to(path, c[0], current_y);
+            current_x = c[0];
+        } else if(command == 'V' || command == 'v') {
+            if(!parse_coordinates(&it, end, c + 1, 1))
+                return false;
+            if(command == 'v')
+                c[1] += current_y;
+
+            otfsvg_path_line_to(path, current_x, c[1]);
+            current_y = c[1];
         } else if(command == 'Q' || command == 'q') {
             if(!parse_coordinates(&it, end, c, 4))
                 return false;
@@ -1362,22 +1378,6 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             last_control_y = c[3];
             current_x = c[4];
             current_y = c[5];
-        } else if(command == 'H' || command == 'h') {
-            if(!parse_coordinates(&it, end, c, 1))
-                return false;
-            if(command == 'h')
-                c[0] += current_x;
-
-            otfsvg_path_line_to(path, c[0], current_y);
-            current_x = last_control_x = c[0];
-        } else if(command == 'V' || command == 'v') {
-            if(!parse_coordinates(&it, end, c + 1, 1))
-                return false;
-            if(command == 'v')
-                c[1] += current_y;
-
-            otfsvg_path_line_to(path, current_x, c[1]);
-            current_y = last_control_y = c[1];
         } else if(command == 'A' || command == 'a') {
             if(!parse_coordinates(&it, end, c, 3)
                 || !parse_arc_flag(&it, end, f)
@@ -1392,12 +1392,12 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
             }
 
             otfsvg_path_arc_to(path, current_x, current_y, c[0], c[1], c[2], f[0], f[1], c[3], c[4]);
-            current_x = last_control_x = c[3];
-            current_y = last_control_y = c[4];
+            current_x = c[3];
+            current_y = c[4];
         } else if(command == 'Z' || command == 'z'){
             otfsvg_path_close(path);
-            current_x = last_control_x = start_x;
-            current_y = last_control_y = start_y;
+            current_x = start_x;
+            current_y = start_y;
         } else {
             return false;
         }
@@ -1406,10 +1406,9 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
         if(it >= end)
             break;
 
-        if(IS_ALPHA(*it)) {
-            last_command = command;
+        last_command = command;
+        if(IS_ALPHA(*it))
             command = *it++;
-        }
     }
 
     return true;
