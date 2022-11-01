@@ -1251,6 +1251,7 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
         return false;
 
     char command = *it++;
+    char last_command = command;
     float c[6];
     bool f[2];
 
@@ -1260,7 +1261,6 @@ static bool parse_path(element_t* element, int id, otfsvg_path_t* path)
     float last_control_y = 0;
     float current_x = 0;
     float current_y = 0;
-    char last_command = command;
     while(true) {
         skip_ws(&it, end);
         if(command == 'M' || command == 'm') {
@@ -1858,7 +1858,7 @@ static float resolve_length(const otfsvg_document_t* document, const length_t* l
 {
     if(length->type == length_type_percent) {
         float w = document->width;
-        float h = document->width;
+        float h = document->height;
         float max = (mode == 'x') ? w : (mode == 'y') ? h : sqrtf(w*w+h*h) / otfsvg_sqrt2;
         return length->value * max / 100.f;
     }
@@ -2991,7 +2991,7 @@ bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas
 
     render_state_t state;
     state.mode = render_mode_display;
-    otfsvg_rect_init(&state.bbox, 0, 0, 0, 0);
+    otfsvg_rect_init(&state.bbox, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
     otfsvg_matrix_init_identity(&state.matrix);
     if(id == NULL) {
         state.element = document->root;
@@ -3010,6 +3010,7 @@ bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas
 
 bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, const char* id)
 {
+    otfsvg_rect_init(rect, 0, 0, 0, 0);
     if(document->root == NULL)
         return false;
     document->canvas = NULL;
@@ -3020,7 +3021,7 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
 
     render_state_t state;
     state.mode = render_mode_bounding;
-    otfsvg_rect_init(&state.bbox, 0, 0, 0, 0);
+    otfsvg_rect_init(&state.bbox, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
     otfsvg_matrix_init_identity(&state.matrix);
     if(id == NULL) {
         state.element = document->root;
@@ -3034,9 +3035,7 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
         render_element(document, &state, state.element);
     }
 
-    rect->x = state.bbox.x;
-    rect->y = state.bbox.y;
-    rect->w = state.bbox.w;
-    rect->h = state.bbox.h;
+    if(state.bbox.w >= 0 && state.bbox.h >= 0)
+        otfsvg_rect_init(rect, state.bbox.x, state.bbox.y, state.bbox.w, state.bbox.h);
     return true;
 }
