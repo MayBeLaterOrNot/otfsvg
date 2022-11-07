@@ -516,8 +516,8 @@ struct otfsvg_document {
     otfsvg_paint_t paint;
     otfsvg_stroke_data_t strokedata;
     otfsvg_color_t current_color;
-    float width;
-    float height;
+    otfsvg_matrix_t matrix;
+    otfsvg_rect_t rect;
     float dpi;
 };
 
@@ -1819,12 +1819,9 @@ static void render_state_begin(otfsvg_document_t* document, render_state_t* stat
     parse_transform(element, ID_TRANSFORM, &newstate->matrix);
     otfsvg_matrix_multiply(&newstate->matrix, &newstate->matrix, &state->matrix);
 
+    otfsvg_rect_init(&newstate->bbox, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
     newstate->clippath = resolve_iri(document, element, ID_CLIP_PATH);
     newstate->opacity = opacity;
-    newstate->bbox.x = 0;
-    newstate->bbox.y = 0;
-    newstate->bbox.w = 0;
-    newstate->bbox.h = 0;
     newstate->compositing = false;
     if(newstate->mode == render_mode_bounding)
         return;
@@ -1857,8 +1854,8 @@ static void render_state_end(otfsvg_document_t* document, render_state_t* state,
 static float resolve_length(const otfsvg_document_t* document, const length_t* length, char mode)
 {
     if(length->type == length_type_percent) {
-        float w = document->width;
-        float h = document->height;
+        float w = document->rect.w;
+        float h = document->rect.h;
         float max = (mode == 'x') ? w : (mode == 'y') ? h : sqrtf(w*w+h*h) / otfsvg_sqrt2;
         return length->value * max / 100.f;
     }
@@ -2347,24 +2344,14 @@ static void render_image(otfsvg_document_t* document, render_state_t* state, ele
 
 static void render_svg(otfsvg_document_t* document, render_state_t* state, element_t* element)
 {
-    if(document->width == 0.f || document->height == 0.f)
+    if(document->rect.w == 0.f || document->rect.h == 0.f)
         return;
     if(is_display_none(element))
         return;
 
-    length_t x = {0, length_type_px};
-    length_t y = {0, length_type_px};
-
-    parse_length(element, ID_X, &x, true, false);
-    parse_length(element, ID_Y, &y, true, false);
-
     render_state_t newstate = {element, state->mode};
     render_state_begin(document, state, &newstate, otfsvg_blend_mode_src_over);
-
-    float _x = resolve_length(document, &x, 'x');
-    float _y = resolve_length(document, &y, 'y');
-
-    otfsvg_matrix_translate(&newstate.matrix, _x, _y);
+    otfsvg_matrix_translate(&newstate.matrix, document->rect.x, document->rect.y);
 
     otfsvg_rect_t viewbox;
     if(parse_view_box(element, ID_VIEWBOX, &viewbox)) {
@@ -2372,7 +2359,7 @@ static void render_svg(otfsvg_document_t* document, render_state_t* state, eleme
         parse_position(element, ID_PRESERVE_ASPECT_RATIO, &position);
 
         otfsvg_matrix_t matrix;
-        position_get_matrix(&position, &matrix, &viewbox, document->width, document->height);
+        position_get_matrix(&position, &matrix, &viewbox, document->rect.w, document->rect.h);
         otfsvg_matrix_multiply(&newstate.matrix, &matrix, &newstate.matrix);
     }
 
@@ -2699,11 +2686,11 @@ otfsvg_document_t* otfsvg_document_create(void)
     otfsvg_array_init(document->path.points);
     otfsvg_array_init(document->paint.gradient.stops);
     otfsvg_array_init(document->strokedata.dasharray);
+    otfsvg_matrix_init_identity(&document->matrix);
+    otfsvg_rect_init(&document->rect, 0, 0, 0, 0);
     document->idcache = hashmap_create();
     document->heap = heap_create();
     document->root = NULL;
-    document->width = 0.f;
-    document->height = 0.f;
     document->dpi = 96.f;
     document->canvas = NULL;
     return document;
@@ -2724,9 +2711,9 @@ void otfsvg_document_clear(otfsvg_document_t* document)
 {
     hashmap_clear(document->idcache);
     heap_clear(document->heap);
+    otfsvg_matrix_init_identity(&document->matrix);
+    otfsvg_rect_init(&document->rect, 0, 0, 0, 0);
     document->root = NULL;
-    document->width = 0.f;
-    document->height = 0.f;
 }
 
 static bool parse_attributes(const char** begin, const char* end, otfsvg_document_t* document, element_t* element)
@@ -2949,34 +2936,47 @@ bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t 
         return false;
     }
 
-    otfsvg_rect_t viewbox;
-    if(parse_view_box(document->root, ID_VIEWBOX, &viewbox)) {
-        document->width = viewbox.w;
-        document->height = viewbox.h;
-        document->dpi = dpi;
-    } else {
+    otfsvg_rect_t rect;
+    if(!parse_view_box(document->root, ID_VIEWBOX, &rect)) {
+        length_t x = {0, length_type_px};
+        length_t y = {0, length_type_px};
         length_t w = {100, length_type_percent};
         length_t h = {100, length_type_percent};
 
+        parse_length(document->root, ID_X, &x, true, false);
+        parse_length(document->root, ID_Y, &y, true, false);
         parse_length(document->root, ID_WIDTH, &w, false, false);
         parse_length(document->root, ID_HEIGHT, &h, false, false);
 
-        document->width = convert_length(&w, width, dpi);
-        document->height = convert_length(&h, height, dpi);
-        document->dpi = dpi;
+        rect.x = convert_length(&x, width, dpi);
+        rect.y = convert_length(&y, height, dpi);
+        rect.w = convert_length(&w, width, dpi);
+        rect.h = convert_length(&h, height, dpi);
     }
 
+    document->rect = rect;
+    document->dpi = dpi;
     return true;
 }
 
 float otfsvg_document_width(const otfsvg_document_t* document)
 {
-    return document->width;
+    return document->rect.w;
 }
 
 float otfsvg_document_height(const otfsvg_document_t* document)
 {
-    return document->height;
+    return document->rect.h;
+}
+
+void otfsvg_document_set_matrix(otfsvg_document_t* document, const otfsvg_matrix_t* matrix)
+{
+    document->matrix = *matrix;
+}
+
+void otfsvg_document_get_matrix(const otfsvg_document_t* document, otfsvg_matrix_t* matrix)
+{
+    *matrix = document->matrix;
 }
 
 bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, void* canvas_data, otfsvg_palette_func_t palette_func, void* palette_data, otfsvg_color_t current_color, const char* id)
@@ -2991,8 +2991,8 @@ bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas
 
     render_state_t state;
     state.mode = render_mode_display;
+    state.matrix = document->matrix;
     otfsvg_rect_init(&state.bbox, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-    otfsvg_matrix_init_identity(&state.matrix);
     if(id == NULL) {
         state.element = document->root;
         render_svg(document, &state, state.element);
@@ -3021,8 +3021,8 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
 
     render_state_t state;
     state.mode = render_mode_bounding;
+    state.matrix = document->matrix;
     otfsvg_rect_init(&state.bbox, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-    otfsvg_matrix_init_identity(&state.matrix);
     if(id == NULL) {
         state.element = document->root;
         render_svg(document, &state, state.element);
@@ -3036,6 +3036,6 @@ bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, cons
     }
 
     if(state.bbox.w >= 0 && state.bbox.h >= 0)
-        otfsvg_rect_init(rect, state.bbox.x, state.bbox.y, state.bbox.w, state.bbox.h);
+        otfsvg_matrix_map_rect(&document->matrix, &state.bbox, rect);
     return true;
 }

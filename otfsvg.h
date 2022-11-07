@@ -225,6 +225,8 @@ void otfsvg_document_destory(otfsvg_document_t* document);
 bool otfsvg_document_load(otfsvg_document_t* document, const char* data, size_t length, float width, float height, float dpi);
 float otfsvg_document_width(const otfsvg_document_t* document);
 float otfsvg_document_height(const otfsvg_document_t* document);
+void otfsvg_document_set_matrix(otfsvg_document_t* document, const otfsvg_matrix_t* matrix);
+void otfsvg_document_get_matrix(const otfsvg_document_t* document, otfsvg_matrix_t* matrix);
 bool otfsvg_document_rect(otfsvg_document_t* document, otfsvg_rect_t* rect, const char* id);
 bool otfsvg_document_render(otfsvg_document_t* document, otfsvg_canvas_t* canvas, void* canvas_data, otfsvg_palette_func_t palette_func, void* palette_data, otfsvg_color_t current_color, const char* id);
 
