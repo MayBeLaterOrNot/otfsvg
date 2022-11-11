@@ -89,15 +89,15 @@ static void writePath(render_context_t* context, const otfsvg_path_t* path)
     for(int i = 0; i < path->commands.size; ++i) {
         switch(elements[i]) {
         case otfsvg_path_command_move_to:
-            writeF(context, "M%f %f", points[0].x, points[0].y);
+            writeF(context, "M%g %g", points[0].x, points[0].y);
             points += 1;
             break;
         case otfsvg_path_command_line_to:
-            writeF(context, "L%f %f", points[0].x, points[0].y);
+            writeF(context, "L%g %g", points[0].x, points[0].y);
             points += 1;
             break;
         case otfsvg_path_command_cubic_to:
-            writeF(context, "C%f %f %f %f %f %f", points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
+            writeF(context, "C%g %g %g %g %g %g", points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
             points += 3;
             break;
         case otfsvg_path_command_close:
@@ -112,7 +112,7 @@ static void writePath(render_context_t* context, const otfsvg_path_t* path)
 static void writeTransform(render_context_t* context, const otfsvg_matrix_t* matrix)
 {
     writeIndent(context);
-    writeF(context, "transform : matrix(%f %f %f %f %f %f)", matrix->m00, matrix->m10, matrix->m01, matrix->m11, matrix->m02, matrix->m12);
+    writeF(context, "transform : matrix(%g %g %g %g %g %g)", matrix->m00, matrix->m10, matrix->m01, matrix->m11, matrix->m02, matrix->m12);
     newLine(context);
 }
 
@@ -138,11 +138,11 @@ static void writePaint(render_context_t* context, const otfsvg_paint_t* paint)
     if(gradient->type == otfsvg_gradient_type_linear) {
         openBranch(context, "linear-gradient");
         writeIndent(context);
-        writeF(context, "points : %f %f %f %f", gradient->x1, gradient->y1, gradient->x2, gradient->y2);
+        writeF(context, "points : %g %g %g %g", gradient->x1, gradient->y1, gradient->x2, gradient->y2);
     } else {
         openBranch(context, "radial-gradient");
         writeIndent(context);
-        writeF(context, "points : %f %f %f %f %f", gradient->cx, gradient->cy, gradient->r, gradient->fx, gradient->fy);
+        writeF(context, "points : %g %g %g %g %g", gradient->cx, gradient->cy, gradient->r, gradient->fx, gradient->fy);
     }
 
     newLine(context);
@@ -166,7 +166,7 @@ static void writePaint(render_context_t* context, const otfsvg_paint_t* paint)
     for(int i = 0; i < gradient->stops.size; ++i) {
         openBranch(context, "stop");
         writeIndent(context);
-        writeF(context, "offset : %f", stops[i].offset);
+        writeF(context, "offset : %g", stops[i].offset);
         newLine(context);
         writeColor(context, stops[i].color);
         closeBranch(context);
@@ -200,7 +200,7 @@ static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_
     writePath(context, path);
     writeTransform(context, matrix);
     writeIndent(context);
-    writeF(context, "line-width : %f", strokedata->linewidth);
+    writeF(context, "line-width : %g", strokedata->linewidth);
     newLine(context);
     writeIndent(context);
     writeString(context, "line-cap : ");
@@ -233,15 +233,15 @@ static bool writeStroke(void* userdata, const otfsvg_path_t* path, const otfsvg_
 
     newLine(context);
     writeIndent(context);
-    writeF(context, "miter-limit : %f", strokedata->miterlimit);
+    writeF(context, "miter-limit : %g", strokedata->miterlimit);
     if(strokedata->dasharray.size > 0) {
         newLine(context);
         writeIndent(context);
-        writeF(context, "dash-offset : %f", strokedata->dashoffset);
+        writeF(context, "dash-offset : %g", strokedata->dashoffset);
         newLine(context);
         writeString(context, "dash-array : ");
         for(int i = 0; i < strokedata->dasharray.size; ++i) {
-            writeF(context, "%f ", strokedata->dasharray.data[i]);
+            writeF(context, "%g ", strokedata->dasharray.data[i]);
         }
     }
 
@@ -256,7 +256,7 @@ static bool pushGroup(void* userdata, float opacity, otfsvg_blend_mode_t mode)
     render_context_t* context = userdata;
     openBranch(context, "group");
     writeIndent(context);
-    writeF(context, "opacity : %f", opacity);
+    writeF(context, "opacity : %g", opacity);
     newLine(context);
     writeIndent(context);
     writeString(context, "blend-mode : ");
@@ -331,13 +331,14 @@ int main(int argc, char* argv[])
     }
 
     writeIndent(&context);
-    writeF(&context, "rect : %f %f %f %f", rect.x, rect.y, rect.w, rect.h);
+    writeF(&context, "rect : %g %g %g %g", rect.x, rect.y, rect.w, rect.h);
     newLine(&context);
 
     otfsvg_canvas_t canvas = {writeFill, writeStroke, pushGroup, popGroup, NULL, NULL};
     otfsvg_document_render(document, &canvas, &context, NULL, NULL, otfsvg_black_color, id);
 
     closeBranch(&context);
+    newLine(&context);
 
 cleanup:
     otfsvg_document_destory(document);
