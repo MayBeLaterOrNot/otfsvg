@@ -43,6 +43,41 @@ typedef struct {
     float h;
 } otfsvg_rect_t;
 
+void otfsvg_rect_init(otfsvg_rect_t* rect, float x, float y, float w, float h);
+void otfsvg_rect_unite(otfsvg_rect_t* rect, const otfsvg_rect_t* source);
+void otfsvg_rect_intersect(otfsvg_rect_t* rect, const otfsvg_rect_t* source);
+
+/**
+ * otfsvg_matrix_t defines an affine transformation matrix
+ * @m00 - horizontal scaling
+ * @m10 - vertical skewing
+ * @m01 - horizontal skewing
+ * @m11 - vertical scaling
+ * @m02 - horizontal translation
+ * @m12 - vertical translation
+ **/
+typedef struct {
+    float m00; float m10;
+    float m01; float m11;
+    float m02; float m12;
+} otfsvg_matrix_t;
+
+void otfsvg_matrix_init(otfsvg_matrix_t* matrix, float m00, float m10, float m01, float m11, float m02, float m12);
+void otfsvg_matrix_init_identity(otfsvg_matrix_t* matrix);
+void otfsvg_matrix_init_translate(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_init_scale(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_init_shear(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_init_rotate(otfsvg_matrix_t* matrix, float angle, float x, float y);
+void otfsvg_matrix_translate(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_scale(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_shear(otfsvg_matrix_t* matrix, float x, float y);
+void otfsvg_matrix_rotate(otfsvg_matrix_t* matrix, float angle, float x, float y);
+void otfsvg_matrix_multiply(otfsvg_matrix_t* matrix, const otfsvg_matrix_t* a, const otfsvg_matrix_t* b);
+bool otfsvg_matrix_invert(otfsvg_matrix_t* matrix);
+void otfsvg_matrix_map(const otfsvg_matrix_t* matrix, float x, float y, float* _x, float* _y);
+void otfsvg_matrix_map_point(const otfsvg_matrix_t* matrix, const otfsvg_point_t* src, otfsvg_point_t* dst);
+void otfsvg_matrix_map_rect(const otfsvg_matrix_t* matrix, const otfsvg_rect_t* src, otfsvg_rect_t* dst);
+
 typedef enum {
     otfsvg_path_command_move_to,
     otfsvg_path_command_line_to,
@@ -88,21 +123,6 @@ typedef struct {
         int capacity;
     } points;
 } otfsvg_path_t;
-
-/**
- * otfsvg_matrix_t defines an affine transformation matrix
- * @m00 - horizontal scaling
- * @m10 - vertical skewing
- * @m01 - horizontal skewing
- * @m11 - vertical scaling
- * @m02 - horizontal translation
- * @m12 - vertical translation
- **/
-typedef struct {
-    float m00; float m10;
-    float m01; float m11;
-    float m02; float m12;
-} otfsvg_matrix_t;
 
 /**
  * otfsvg_color_t defines a 32-bit RGBA color (8-bit per component) stored as 0xAARRGGBB

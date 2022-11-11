@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(otfsvg LANGUAGES C)
 
-add_library(otfsvg STATIC otfsvg.h otfsvg-private.h otfsvg-geometry.c otfsvg-document.c)
+add_library(otfsvg STATIC otfsvg.h otfsvg.c)
 
 target_include_directories(otfsvg PUBLIC "${CMAKE_CURRENT_LIST_DIR}")
 
